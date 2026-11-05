@@ -6,108 +6,147 @@
 
 ## 1. Introdução
 
-O presente projeto consiste no desenvolvimento de uma versão distribuída, baseada em turnos, do clássico jogo **Bomberman**, adaptada especificamente para partidas competitivas no formato **1v1 estrito (exatamente dois jogadores)** em um tabuleiro matricial de dimensões **9x9**. 
+### 1.1. Descrição do Jogo Escolhido
+O presente projeto consiste no desenvolvimento de uma versão distribuída, baseada em turnos, do clássico jogo **Bomberman**, adaptada especificamente para partidas competitivas no formato **1v1 estrito (exatamente dois jogadores)** em um tabuleiro matricial de dimensões **9x9**.
 
-Diferente do Bomberman tradicional em tempo real contínuo, a abordagem em turnos discretos com **Action Points (AP / Estoque de Bombas) acumuláveis** e passos por turno (`movementLeft = 4`) introduz um forte componente estratégico tático. A mecânica de detonação em duas etapas (Opção de Commit do Turno) permite que um jogador posicione bombas, movimente-se para fora do raio letal da explosão e, ao emitir a confirmação de encerramento de turno, acione a deflagração em cruz de todas as cargas ativas, calculando danos a obstáculos e oponentes. Caso decida economizar recursos e não plantar bombas em sua rodada, o jogador é bonificado com `+1 AP` extra de bônus (além da recarga base de `+1 AP` ao início do próximo turno), incentivando o planejamento de emboscadas e o gerenciamento criterioso de recursos até o teto `MAX_AP = 5`.
+Diferente do Bomberman tradicional em tempo real contínuo, a abordagem em turnos discretos opera com um sistema tático de **Action Points (AP / Estoque de Bombas) acumuláveis** e limite de passos por turno (`movementLeft = 4`):
+- **Mapa e Spawns:** O tabuleiro `9x9` possui paredes fixas indestrutíveis (`1`) nas coordenadas onde linha e coluna são ambas ímpares, blocos destrutíveis (`2`) gerados nas demais posições e zonas seguras de nascimento: o **Jogador 1 (`P1`)** inicia no canto superior esquerdo `[0,0]` (com `[0,1]` e `[1,0]` livres) e o **Jogador 2 (`P2`)** inicia no canto inferior direito `[8,8]` (com `[8,7]` e `[7,8]` livres).
+- **Mecânica de Turno e Fuga:** No seu turno, o jogador pode se mover até 4 casas ortogonais e plantar bombas na sua posição atual consumindo `1 AP` por bomba (até o limite `MAX_AP = 5`). Plantar uma bomba **não encerra o turno imediatamente**, permitindo que o jogador utilize seus passos restantes para fugir do raio letal da explosão.
+- **Confirmação do Turno (`confirmarTurno`) e Detonação:** Ao emitir a confirmação de encerramento de turno, todas as bombas ativas no tabuleiro detonam simultaneamente em formato de cruz (alcance de 2 casas em cada direção ortogonal). Paredes indestrutíveis bloqueiam o fogo; blocos destrutíveis são destruídos e interrompem a propagação naquela direção; jogadores atingidos pelo fogo são eliminados.
+- **Economia de Recursos (Bônus de AP):** Ao início de cada turno, o jogador da vez recebe `+1 AP` de recarga base. Caso o jogador encerre seu turno sem ter plantado nenhuma bomba (`bombsPlantedThisTurn == 0`), recebe um bônus estratégico de `+1 AP` adicional, incentivando o planejamento de emboscadas e o gerenciamento criterioso de recursos até o teto `MAX_AP = 5`.
 
-### Justificativa da Escolha do Java RMI
-A escolha do **Java Remote Method Invocation (RMI)** fundamenta-se nos princípios canônicos de transparência de localização e chamada de procedimento remoto (RPC orientado a objetos):
-1. **Transparência de Acesso e Localização:** O modelo de objetos remotos do Java RMI permite que o cliente interaja com a instância remota do jogo como se fosse um objeto local na JVM, desacoplando a semântica da aplicação dos detalhes de transporte de baixo nível (sockets TCP/IP).
-2. **Serialização Nativa Tipada:** O RMI provê marshaling e unmarshaling automático de tipos complexos e grafos de objetos serializáveis (`GameStateDTO`, `PlayerDTO`, `DirectionEnum`, exceções customizadas) através do protocolo binário nativo **JRMP (Java Remote Method Protocol)**, garantindo integridade de tipos e validação estrita em tempo de compilação e execução.
-3. **Controle Centralizado e Autoridade do Servidor:** Como o estado do tabuleiro e a lógica crítica de colisão, detonação e máquina de turnos residem integralmente no servidor remoto, evita-se qualquer vulnerabilidade de adulteração ou inconsistência de estado por clientes maliciosos (*cheating*).
+### 1.2. Motivação da Escolha do Protocolo (Java RMI)
+A escolha do **Java Remote Method Invocation (Java RMI)** — implementação orientada a objetos do paradigma RPC (Remote Procedure Call) nativa da plataforma Java — fundamenta-se nos seguintes princípios técnicos e arquiteturais:
+1. **Transparência de Acesso e Localização:** O modelo de objetos remotos do Java RMI permite que o cliente invoque métodos da interface remota `IBombermanService` (`conectarJogador`, `mover`, `plantarBomba`, `confirmarTurno`, `obterEstadoJogo`, `desconectarJogador`) com a mesma semântica de uma chamada de método local na JVM, abstraindo a abertura e o gerenciamento manual de sockets TCP/IP.
+2. **Tipagem Forte e Serialização Nativa (Marshaling/Unmarshaling):** O RMI provê serialização automática de objetos complexos de transferência de dados (`GameStateDTO`, `PlayerDTO`, `DirectionEnum`, `GameStatusEnum`) através do protocolo binário nativo **JRMP (Java Remote Method Protocol)**, garantindo integridade de tipos em tempo de compilação e execução.
+3. **Propagação Semântica de Exceções Remotas:** O RMI permite que violações de regra de negócio detectadas no servidor (`InvalidTurnException`, `CollisionException`, `NoMovementLeftException`, `InsufficientApException`, `GameNotStartedException`, `GameFullException`) sejam lançadas diretamente pelo método remoto e capturadas com tipagem exata no lado do cliente.
+4. **Servidor Autoritativo e Controle Centralizado de Concorrência:** Como o estado do tabuleiro `9x9` e a lógica crítica de colisão, detonação e máquina de turnos residem integralmente no objeto remoto `BombermanServiceImpl` protegido por `ReentrantLock(true)`, evita-se qualquer vulnerabilidade de adulteração de estado por clientes (*cheating*) ou condições de corrida.
 
 ---
 
 ## 2. Arquitetura da Solução
 
-### 2.1. Topologia Distribuída e Papel do Local HTTP Bridge
-Aplicações modernas executadas em navegadores web operam em uma *sandbox* restrita que impossibilita a abertura direta de *raw sockets* TCP binários exigidos pelo protocolo JRMP do RMI. Para solucionar essa restrição arquitetural sem comprometer a essência do RMI no backend, foi implementado o padrão de projeto **Local HTTP Adapter / Bridge**:
+### 2.1. Componentes da Arquitetura (Cliente, Servidor, Stub/Skeleton e Middleware/Registry)
+Aplicações modernas executadas em navegadores web operam em uma *sandbox* restrita que impossibilita a abertura direta de *raw sockets* TCP binários exigidos pelo protocolo JRMP do RMI. Para solucionar essa restrição sem comprometer a essência do RMI, foi implementado o padrão **Local HTTP Adapter / Bridge** no lado do cliente:
+
+1. **Interface Gráfica do Cliente (Frontend React + HTML5 Canvas):** Renderiza o tabuleiro `9x9`, o HUD de turno/AP e captura os comandos do jogador, enviando-os via HTTP/JSON para o seu respectivo Client Bridge local e realizando *polling* a cada `300ms` em `GET /api/state`.
+2. **Cliente RMI (`ClientBridgeMain`) & RMI Stub:** Processo Java leve executado no ambiente do cliente que consulta o **RMI Registry** e obtém o **RMI Stub** (proxy dinâmico de `IBombermanService`). O Stub atua como representante local do objeto remoto, realizando o *marshaling* (serialização) dos parâmetros e transmitindo a invocação via JRMP/TCP até o servidor.
+3. **Middleware / RMI Registry (`LocateRegistry` - Porta `1099`):** Serviço de diretório e nomes onde o servidor registra (`Naming.rebind`) a referência pública do objeto remoto sob a chave `"BombermanService"`. Permite que os clientes localizem e obtenham o Stub em tempo de execução via `Naming.lookup("rmi://host:1099/BombermanService")`.
+4. **RMI Skeleton / Dispatcher (Runtime RMI no Servidor):** Camada interna do middleware RMI no lado do servidor que recebe as chamadas binárias JRMP enviadas pelo Stub, realiza o *unmarshaling* (desserialização) dos argumentos, despacha a execução para uma thread do servidor invocando o método real em `BombermanServiceImpl` e serializa o retorno (ou exceção) de volta para o Stub.
+5. **Servidor RMI (`ServerMain` e `BombermanServiceImpl`):** Estende `UnicastRemoteObject` e implementa `IBombermanService`. Mantém em memória a matriz `9x9`, o estado dos jogadores `P1` e `P2` e garante exclusão mútua justa através de `ReentrantLock(true)`.
+
+### 2.2. Diagrama da Arquitetura (Mermaid)
 
 ```mermaid
 graph TD
-    subgraph Browser ["Navegador Web (Frontend React)"]
-        UI1["Cliente 1 (Aba 1 / React Canvas)"]
-        UI2["Cliente 2 (Aba 2 / React Canvas)"]
+    subgraph CamadaVisual ["Interface Gráfica (Navegador Web)"]
+        UI1["Frontend Jogador 1<br/>(React + HTML5 Canvas)"]
+        UI2["Frontend Jogador 2<br/>(React + HTML5 Canvas)"]
     end
 
-    subgraph HostLocal1 ["Host / Ambiente Local Jogador 1"]
+    subgraph CamadaClienteRMI ["Clientes RMI (JVM Local de cada Jogador)"]
         Bridge1["Client Bridge 1 (Porta HTTP 8081)<br/>com.sun.net.httpserver + Gson"]
-        Stub1["RMI Stub (Proxy Dinâmico JRMP)"]
-    end
+        Stub1["RMI Stub 1 (Proxy JRMP)<br/>IBombermanService"]
 
-    subgraph HostLocal2 ["Host / Ambiente Local Jogador 2"]
         Bridge2["Client Bridge 2 (Porta HTTP 8082)<br/>com.sun.net.httpserver + Gson"]
-        Stub2["RMI Stub (Proxy Dinâmico JRMP)"]
+        Stub2["RMI Stub 2 (Proxy JRMP)<br/>IBombermanService"]
     end
 
-    subgraph BackendRMI ["Servidor Distribuído Backend (JVM)"]
-        Registry["RMI Registry (Porta 1099)<br/>Naming.rebind('BombermanService')"]
-        Skeleton["RMI Skeleton / Dispatcher"]
+    subgraph CamadaMiddleware ["Middleware RMI (Porta TCP 1099)"]
+        Registry["RMI Registry (LocateRegistry)<br/>Naming.rebind / lookup ('BombermanService')"]
+    end
+
+    subgraph CamadaServidorRMI ["Servidor Distribuído Backend (JVM Autoritativa)"]
+        Skeleton["RMI Skeleton / Dispatcher<br/>(Unmarshaling JRMP & Thread Pool)"]
         ServiceImpl["BombermanServiceImpl<br/>(UnicastRemoteObject + ReentrantLock)"]
-        GameState[("Estado do Jogo 9x9<br/>P1, P2, Matriz, Turnos")]
+        GameState[("Estado do Jogo 9x9<br/>P1, P2, Matriz, Bombas e Turnos")]
     end
 
-    UI1 -- "HTTP REST / JSON / CORS (Polling 300ms)" --> Bridge1
-    Bridge1 --> Stub1
-    Stub1 -- "JRMP / TCP Socket" --> Registry
-    Stub1 -- "Invocação Remota JRMP" --> Skeleton
+    UI1 -- "1. Ação / Polling 300ms (HTTP JSON)" --> Bridge1
+    Bridge1 -- "2. Invoca método remoto" --> Stub1
+    Stub1 -. "Lookup inicial (JRMP)" .-> Registry
+    Stub1 == "3. Chamada Remota Serializada (JRMP/TCP)" ==> Skeleton
 
-    UI2 -- "HTTP REST / JSON / CORS (Polling 300ms)" --> Bridge2
-    Bridge2 --> Stub2
-    Stub2 -- "JRMP / TCP Socket" --> Registry
-    Stub2 -- "Invocação Remota JRMP" --> Skeleton
+    UI2 -- "1. Ação / Polling 300ms (HTTP JSON)" --> Bridge2
+    Bridge2 -- "2. Invoca método remoto" --> Stub2
+    Stub2 -. "Lookup inicial (JRMP)" .-> Registry
+    Stub2 == "3. Chamada Remota Serializada (JRMP/TCP)" ==> Skeleton
 
-    Skeleton --> ServiceImpl
+    ServiceImpl -. "Bind/Rebind no início" .-> Registry
+    Skeleton -- "4. Despacha chamada desserializada" --> ServiceImpl
     ServiceImpl <--> GameState
 ```
 
-- Cada jogador sobe um processo Java leve `ClientBridgeMain` que realiza o `Naming.lookup` no servidor RMI remoto, obtém a referência do `IBombermanService` e sobe um servidor HTTP embarcado (`com.sun.net.httpserver.HttpServer`) local expondo endpoints REST/JSON com cabeçalhos CORS completos.
-- O frontend React se comunica exclusivamente com o seu Bridge local via requisições HTTP rápidas, realizando requisições pontuais de ação e *polling* contínuo a cada 300ms em `GET /api/state`.
+### 2.3. Fluxo de Mensagens a Cada Jogada (Mermaid)
 
-### 2.2. Diagrama de Sequência do Ciclo de Turno
-
-O diagrama a seguir detalha a interação durante um turno completo de jogo:
+O diagrama de sequência a seguir detalha o fluxo de mensagens entre **Cliente**, **Stub**, **Skeleton** e **Servidor** a cada jogada de um turno:
 
 ```mermaid
 sequenceDiagram
     autonumber
-    actor P1 as Jogador 1 (React)
-    participant B1 as Client Bridge 1
-    participant RMI as Servidor RMI (BombermanServiceImpl)
-    actor P2 as Jogador 2 (React)
-    participant B2 as Client Bridge 2
+    actor P1 as Jogador 1 (React UI)
+    participant B1 as Client Bridge 1 (HTTP)
+    participant Stub1 as RMI Stub (Cliente 1)
+    participant Skel as RMI Skeleton (Servidor)
+    participant Impl as BombermanServiceImpl
+    actor P2 as Jogador 2 (React UI + Stub 2)
 
     Note over P1, P2: Partida IN_PROGRESS (Vez de P1, movementLeft=4, AP=1)
 
-    P1->>B1: POST /api/move {playerId: "P1", direcao: "RIGHT"}
-    B1->>RMI: mover("P1", DirectionEnum.RIGHT)
-    Note over RMI: ReentrantLock adquirido.<br/>Valida vez, limites e obstáculos.<br/>P1.x++, movementLeft=3.
-    RMI-->>B1: GameStateDTO
-    B1-->>P1: 200 OK (Novo Estado)
+    rect rgb(235, 245, 255)
+        Note right of P1: Jogada 1: Movimentação
+        P1->>B1: POST /api/move {playerId: "P1", direcao: "RIGHT"}
+        B1->>Stub1: mover("P1", DirectionEnum.RIGHT)
+        Stub1->>Skel: [JRMP/TCP] Marshaling("P1", RIGHT)
+        Skel->>Impl: Unmarshaling e despacho: mover("P1", RIGHT)
+        Note over Impl: ReentrantLock adquirido.<br/>Valida vez, limites e obstáculos.<br/>P1.x++, movementLeft=3.<br/>ReentrantLock liberado.
+        Impl-->>Skel: Retorna GameStateDTO
+        Skel-->>Stub1: [JRMP/TCP] Marshaling(GameStateDTO)
+        Stub1-->>B1: GameStateDTO desserializado
+        B1-->>P1: 200 OK (JSON com Novo Estado)
+    end
 
-    P1->>B1: POST /api/bomb {playerId: "P1"}
-    B1->>RMI: plantarBomba("P1")
-    Note over RMI: AP--, board[y][x]=BOMB(3),<br/>bombsPlantedThisTurn++.
-    RMI-->>B1: GameStateDTO
-    B1-->>P1: 200 OK (Bomba ativa plantada)
+    rect rgb(255, 245, 235)
+        Note right of P1: Jogada 2: Plantar Bomba e Fugir
+        P1->>B1: POST /api/bomb {playerId: "P1"}
+        B1->>Stub1: plantarBomba("P1")
+        Stub1->>Skel: [JRMP/TCP] Marshaling("P1")
+        Skel->>Impl: plantarBomba("P1")
+        Note over Impl: AP--, board[y][x]=BOMB(3),<br/>bombsPlantedThisTurn++.
+        Impl-->>Skel: Retorna GameStateDTO
+        Skel-->>Stub1: [JRMP/TCP] Marshaling(GameStateDTO)
+        Stub1-->>B1: GameStateDTO desserializado
+        B1-->>P1: 200 OK (Bomba ativa plantada)
+        P1->>Stub1: mover("P1", DOWN) -> mover("P1", LEFT) (Fuga em L para fora da cruz)
+    end
 
-    P1->>B1: POST /api/move {playerId: "P1", direcao: "LEFT"}
-    B1->>RMI: mover("P1", DirectionEnum.LEFT)
-    Note over RMI: P1 recua para fora da cruz.<br/>movementLeft=2.
-    RMI-->>B1: GameStateDTO
-    B1-->>P1: 200 OK (Fuga realizada)
+    rect rgb(240, 255, 240)
+        Note right of P1: Jogada 3: Confirmar Turno e Detonação
+        P1->>B1: POST /api/confirm {playerId: "P1"}
+        B1->>Stub1: confirmarTurno("P1")
+        Stub1->>Skel: [JRMP/TCP] Marshaling("P1")
+        Skel->>Impl: confirmarTurno("P1")
+        Note over Impl: 1. Detonação das bombas em cruz (raio 2).<br/>2. Destruição de blocos e cálculo de dano.<br/>3. Toggle direto de turno: P1 -> P2.<br/>4. P2.movementLeft=4, P2.AP++.<br/>ReentrantLock liberado.
+        Impl-->>Skel: Retorna GameStateDTO
+        Skel-->>Stub1: [JRMP/TCP] Marshaling(GameStateDTO)
+        Stub1-->>B1: GameStateDTO desserializado
+        B1-->>P1: 200 OK (Turno Concluído)
+    end
 
-    P1->>B1: POST /api/confirm {playerId: "P1"}
-    B1->>RMI: confirmarTurno("P1")
-    Note over RMI: 1. Detonação das bombas em cruz (raio 2).<br/>2. Destruição de blocos e cálculo de dano.<br/>3. Toggle direto de turno: P1 -> P2.<br/>4. P2.movementLeft=4, P2.AP++.<br/>ReentrantLock liberado.
-    RMI-->>B1: GameStateDTO
-    B1-->>P1: 200 OK (Turno Concluído)
-
-    Note over P2, B2: Polling de P2 detecta que agora é a sua vez (300ms)
-    B2->>RMI: obterEstadoJogo()
-    RMI-->>B2: GameStateDTO (currentTurnPlayerId="P2")
-    B2-->>P2: HUD atualiza: "👉 SUA VEZ! 👈"
+    Note over P2, Impl: Polling de P2 detecta mudança de estado (a cada 300ms)
+    P2->>Impl: obterEstadoJogo() via Stub 2 -> Skeleton (JRMP)
+    Impl-->>P2: GameStateDTO (currentTurnPlayerId="P2", HUD: "SUA VEZ!")
 ```
+
+#### Explicação Passo a Passo do Fluxo a Cada Jogada:
+1. **Descoberta Inicial (`Bind` & `Lookup`):** Ao iniciar, o `ServerMain` instancia `BombermanServiceImpl` e o registra no **RMI Registry** (`porta 1099`). O `ClientBridgeMain` de cada jogador consulta o Registry via `Naming.lookup("rmi://localhost:1099/BombermanService")` e recebe a instância serializada do **RMI Stub**.
+2. **Captura do Comando no Cliente:** Quando o jogador da vez realiza uma ação na interface web (mover com `WASD`/setas, plantar bomba com `Espaço` ou confirmar turno com `Enter`), o React envia uma requisição HTTP `POST` com payload JSON para o seu `ClientBridgeMain` local.
+3. **Serialização no Stub (*Marshaling*):** O `ClientBridgeMain` invoca o método equivalente na referência local do **RMI Stub** (ex.: `stub.mover(playerId, DirectionEnum.RIGHT)`). O Stub empacota o identificador do método e serializa os parâmetros em fluxo binário, transmitindo-os sobre TCP/IP utilizando o protocolo **JRMP**.
+4. **Recepção no Skeleton (*Unmarshaling*) e Execução Sincronizada:** O **RMI Skeleton/Dispatcher** no servidor lê os bytes do socket JRMP, desserializa os argumentos e invoca o método no objeto real `BombermanServiceImpl`. A thread adquire o `ReentrantLock(true)`, valida o estado da partida (`IN_PROGRESS`), verifica se o `playerId` é o dono do turno atual (`currentTurnPlayerId`) e aplica as regras de colisão, saldo de movimentos ou detonação na matriz `9x9`.
+5. **Resposta Serializada ou Tratamento de Exceção:**
+   - **Jogada Válida:** O método constrói um novo snapshot imutável `GameStateDTO` contendo a matriz `9x9` atualizada, o estado de `P1` e `P2` e o log da jogada. O Skeleton serializa o `GameStateDTO` via JRMP de volta ao Stub, que o entrega ao `ClientBridgeMain` para conversão em JSON (`HTTP 200 OK`) e imediata re-renderização no Canvas HTML5.
+   - **Jogada Inválida:** Caso ocorra violação de regra (ex.: tentar andar contra parede fixa ou jogar fora do turno), `BombermanServiceImpl` lança uma exceção verificada (`CollisionException`, `InvalidTurnException`, etc.). O Skeleton serializa a exceção via JRMP, o Stub a relança no cliente Java, e o `ClientBridgeMain` a traduz em resposta `HTTP 400 Bad Request` exibida como alerta visual na interface.
+6. **Sincronização Contínua do Oponente:** Enquanto um jogador executa suas ações, o cliente do adversário realiza chamadas periódicas a `obterEstadoJogo()` (a cada `300ms`), recebendo via Stub/Skeleton o `GameStateDTO` atualizado e refletindo na tela cada passo, bomba plantada, explosão e troca de turno.
 
 ---
 
