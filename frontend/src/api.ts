@@ -79,4 +79,10 @@ export class BridgeApi {
       body: JSON.stringify({ playerId })
     });
   }
+
+  async restartMatch(): Promise<GameStateDTO> {
+    return this.request<GameStateDTO>('/api/restart', {
+      method: 'POST'
+    });
+  }
 }

@@ -111,6 +111,21 @@ export const App: React.FC = () => {
     }
   }, [localPlayer, isActionLoading, showError]);
 
+  // Action: Restart Match (Rematch)
+  const handleRestartMatch = useCallback(async () => {
+    if (!localPlayer || isActionLoading) return;
+    setIsActionLoading(true);
+    try {
+      const newState = await apiRef.current.restartMatch();
+      setGameState(newState);
+      setErrorMessage(null);
+    } catch (err: any) {
+      showError(err.message);
+    } finally {
+      setIsActionLoading(false);
+    }
+  }, [localPlayer, isActionLoading, showError]);
+
   // Polling: 300ms interval for real-time game state synchronization
   useEffect(() => {
     let isMounted = true;
@@ -119,6 +134,13 @@ export const App: React.FC = () => {
       try {
         const state = await apiRef.current.getState();
         if (isMounted) {
+          // Se o jogador local foi removido do servidor (ex: partida reiniciada por nova conexão), volta ao lobby
+          const stillInMatch = state.players.some(p => p.id === localPlayer.id && p.nome === localPlayer.nome);
+          if (!stillInMatch && state.status !== 'FINISHED') {
+            setLocalPlayer(null);
+            setGameState(null);
+            return;
+          }
           setGameState(state);
         }
       } catch (err) {
@@ -281,6 +303,7 @@ export const App: React.FC = () => {
               onMove={handleMove}
               onPlantBomb={handlePlantBomb}
               onConfirmTurn={handleConfirmTurn}
+              onRestartMatch={handleRestartMatch}
               isActionLoading={isActionLoading}
               errorMessage={errorMessage}
             />

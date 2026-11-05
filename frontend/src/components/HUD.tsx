@@ -1,6 +1,6 @@
 import React from 'react';
 import { Direction, GameStateDTO, PlayerDTO } from '../types';
-import { ArrowUp, ArrowDown, ArrowLeft, ArrowRight, Bomb, CheckCircle2, ShieldAlert, Award, Footprints } from 'lucide-react';
+import { ArrowUp, ArrowDown, ArrowLeft, ArrowRight, Bomb, CheckCircle2, ShieldAlert, Award, Skull, Scale, RotateCcw, Footprints } from 'lucide-react';
 
 interface HUDProps {
   gameState: GameStateDTO | null;
@@ -8,6 +8,7 @@ interface HUDProps {
   onMove: (dir: Direction) => void;
   onPlantBomb: () => void;
   onConfirmTurn: () => void;
+  onRestartMatch: () => void;
   isActionLoading: boolean;
   errorMessage: string | null;
 }
@@ -18,6 +19,7 @@ export const HUD: React.FC<HUDProps> = ({
   onMove,
   onPlantBomb,
   onConfirmTurn,
+  onRestartMatch,
   isActionLoading,
   errorMessage
 }) => {
@@ -72,18 +74,58 @@ export const HUD: React.FC<HUDProps> = ({
         )}
       </div>
 
-      {/* 2. Winner Announcement Banner */}
-      {gameState.status === 'FINISHED' && (
-        <div className="p-4 rounded-xl bg-gradient-to-r from-amber-500/20 via-purple-500/20 to-pink-500/20 border border-amber-400/50 text-center animate-bounce">
-          <Award className="w-8 h-8 text-amber-400 mx-auto mb-1" />
-          <h3 className="text-lg font-black text-amber-300 font-arcade">VITÓRIA!</h3>
-          <p className="text-sm font-semibold text-gray-200 mt-1">
-            {gameState.winnerId === 'EMPATE' 
-              ? 'Fim de jogo: Houve um empate duplo!' 
-              : `Vencedor: ${gameState.winnerName} (${gameState.winnerId})`}
-          </p>
-        </div>
-      )}
+      {/* 2. Match Result Banner (Victory / Defeat / Draw) */}
+      {gameState.status === 'FINISHED' && (() => {
+        const isDraw = gameState.winnerId === 'EMPATE';
+        const isWinner = !isDraw && localPlayer && gameState.winnerId === localPlayer.id;
+
+        let bannerContent;
+        if (isDraw) {
+          bannerContent = (
+            <div className="p-4 rounded-xl bg-gradient-to-r from-slate-500/20 via-gray-500/20 to-zinc-500/20 border border-slate-400/50 text-center">
+              <Scale className="w-8 h-8 text-slate-300 mx-auto mb-1" />
+              <h3 className="text-lg font-black text-slate-200 font-arcade">EMPATE!</h3>
+              <p className="text-sm font-semibold text-gray-300 mt-1">
+                Fim de jogo: Ambos os jogadores foram eliminados!
+              </p>
+            </div>
+          );
+        } else if (isWinner) {
+          bannerContent = (
+            <div className="p-4 rounded-xl bg-gradient-to-r from-amber-500/20 via-purple-500/20 to-pink-500/20 border border-amber-400/50 text-center animate-bounce">
+              <Award className="w-8 h-8 text-amber-400 mx-auto mb-1" />
+              <h3 className="text-lg font-black text-amber-300 font-arcade">VITÓRIA!</h3>
+              <p className="text-sm font-semibold text-gray-200 mt-1">
+                Você venceu a partida! ({gameState.winnerName})
+              </p>
+            </div>
+          );
+        } else {
+          bannerContent = (
+            <div className="p-4 rounded-xl bg-gradient-to-r from-rose-950/60 via-red-900/30 to-rose-950/60 border border-rose-500/50 text-center">
+              <Skull className="w-8 h-8 text-rose-400 mx-auto mb-1 animate-pulse" />
+              <h3 className="text-lg font-black text-rose-400 font-arcade">DERROTA!</h3>
+              <p className="text-sm font-semibold text-gray-200 mt-1">
+                Você foi eliminado! Vencedor: {gameState.winnerName} ({gameState.winnerId})
+              </p>
+            </div>
+          );
+        }
+
+        return (
+          <div className="flex flex-col gap-2">
+            {bannerContent}
+            <button
+              onClick={onRestartMatch}
+              disabled={isActionLoading}
+              className="w-full py-2.5 px-4 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 active:scale-[0.98] disabled:opacity-50 text-white font-black text-xs uppercase tracking-wider rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-indigo-950/50 border border-indigo-400/40 transition"
+            >
+              <RotateCcw className="w-4 h-4" />
+              <span>Jogar Novamente / Revanche</span>
+            </button>
+          </div>
+        );
+      })()}
 
       {/* 3. Players Cards (P1 vs P2) */}
       <div className="grid grid-cols-2 gap-3">
@@ -127,7 +169,7 @@ export const HUD: React.FC<HUDProps> = ({
                 </div>
                 <div className="flex justify-between">
                   <span>Passos Restantes:</span>
-                  <span className="font-bold text-emerald-400">{p.movementLeft} / 4</span>
+                  <span className="font-bold text-emerald-400">{p.movementLeft} / 5</span>
                 </div>
               </div>
             </div>
@@ -154,7 +196,7 @@ export const HUD: React.FC<HUDProps> = ({
               <Footprints className="w-3.5 h-3.5 text-emerald-400" /> Passos Turno
             </span>
             <span className="text-lg font-black text-emerald-400">
-              {movementLeft} <span className="text-xs font-normal text-gray-500">/ 4</span>
+              {movementLeft} <span className="text-xs font-normal text-gray-500">/ 5</span>
             </span>
           </div>
         </div>
