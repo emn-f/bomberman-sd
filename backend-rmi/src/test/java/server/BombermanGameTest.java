@@ -88,7 +88,7 @@ public class BombermanGameTest {
         // Toggle direto para P2
         assertEquals(p2.getId(), state.getCurrentTurnPlayerId(), "O turno deve ter alternado diretamente para P2");
         PlayerDTO p2State = state.getPlayers().get(1);
-        assertEquals(4, p2State.getMovementLeft(), "P2 deve iniciar o turno com 4 movimentos");
+        assertEquals(5, p2State.getMovementLeft(), "P2 deve iniciar o turno com 5 movimentos");
         assertEquals(2, p2State.getAp(), "P2 deve ter recebido +1 AP base no início de seu turno (total 2)");
     }
 

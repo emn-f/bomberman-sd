@@ -64,7 +64,7 @@ Acesse `http://localhost:3000`:
 
 ## 🎮 Controles no Jogo
 
-- **Mover:** Teclas `W`, `A`, `S`, `D` ou Setas do teclado (ou botões no D-Pad da HUD). Consome 1 movimento de 4.
+- **Mover:** Teclas `W`, `A`, `S`, `D` ou Setas do teclado (ou botões no D-Pad da HUD). Consome 1 movimento de 5.
 - **Plantar Bomba:** Tecla `Espaço` ou botão **"Plantar Bomba (-1 AP)"**.
 - **Confirmar Turno:** Tecla `Enter` ou botão **"Confirmar Turno / Detonar"** (detona todas as bombas ativas em cruz de raio 2 e passa a vez).
 - **Economia de Bombas:** Passar o turno sem plantar bombas garante **+1 AP de bônus** extra para a próxima rodada!
