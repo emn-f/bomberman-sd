@@ -284,11 +284,7 @@ public class BombermanServiceImpl extends UnicastRemoteObject implements IBomber
                 }
             }
 
-            // --- 2. AP BÔNUS DO JOGADOR ATUAL ---
-            if (current.getBombsPlantedThisTurn() == 0) {
-                current.setAp(Math.min(current.getAp() + 1, PlayerDTO.MAX_AP));
-                report.append(current.getNome()).append(" economizou bomba e ganhou +1 AP de bônus! ");
-            }
+            // --- 2. RESET CONTADOR DE BOMBAS DO TURNO ---
             current.setBombsPlantedThisTurn(0);
 
             // --- 3. CONDIÇÃO DE VITÓRIA / TOGGLE DIRETO ---
@@ -310,11 +306,19 @@ public class BombermanServiceImpl extends UnicastRemoteObject implements IBomber
             } else {
                 // Ambos vivos: Toggle direto entre P1 e P2
                 currentTurnPlayerId = opponent.getId();
-                opponent.setMovementLeft(PlayerDTO.INITIAL_MOVEMENT);
-                opponent.setAp(Math.min(opponent.getAp() + 1, PlayerDTO.MAX_AP)); // +1 AP base
+                int nextPlayerTurn = (turnNumber / 2) + 1;
+                int nextMaxMovement = PlayerDTO.calculateMaxMovementForTurn(nextPlayerTurn);
+                int nextBombAllowance = PlayerDTO.calculateBombAllowanceForTurn(nextPlayerTurn);
+                opponent.setTurnsPlayed(nextPlayerTurn);
+                opponent.setMaxMovement(nextMaxMovement);
+                opponent.setMovementLeft(nextMaxMovement);
+                opponent.setAp(nextBombAllowance);
                 opponent.setBombsPlantedThisTurn(0);
                 turnNumber++;
-                report.append("Novo turno: vez de ").append(opponent.getNome()).append(".");
+                report.append("Novo turno: vez de ").append(opponent.getNome())
+                        .append(" (").append(nextMaxMovement).append(" passos, ")
+                        .append(nextBombAllowance).append(nextBombAllowance > 1 ? " bombas" : " bomba")
+                        .append(").");
             }
 
             lastActionMessage = report.toString().trim();
@@ -383,6 +387,8 @@ public class BombermanServiceImpl extends UnicastRemoteObject implements IBomber
                     p.setY(SPAWN_COORDS[i][1]);
                     p.setVivo(true);
                     p.setAp(PlayerDTO.INITIAL_AP);
+                    p.setTurnsPlayed(1);
+                    p.setMaxMovement(PlayerDTO.INITIAL_MOVEMENT);
                     p.setMovementLeft(PlayerDTO.INITIAL_MOVEMENT);
                     p.setBombsPlantedThisTurn(0);
                 }
@@ -464,6 +470,8 @@ public class BombermanServiceImpl extends UnicastRemoteObject implements IBomber
         copy.setVivo(src.isVivo());
         copy.setAp(src.getAp());
         copy.setMovementLeft(src.getMovementLeft());
+        copy.setMaxMovement(src.getMaxMovement());
+        copy.setTurnsPlayed(src.getTurnsPlayed());
         copy.setBombsPlantedThisTurn(src.getBombsPlantedThisTurn());
         return copy;
     }

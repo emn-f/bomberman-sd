@@ -85,26 +85,67 @@ public class BombermanGameTest {
         // Valida que bomba explodiu (virou CELL_FIRE) e destruiu bloco em (0, 2)
         assertEquals(GameStateDTO.CELL_FIRE, state.getBoard()[0][1]);
 
-        // Toggle direto para P2
+        // Toggle direto para P2 (1º turno de P2: 5 movimentos e 1 bomba inicial)
         assertEquals(p2.getId(), state.getCurrentTurnPlayerId(), "O turno deve ter alternado diretamente para P2");
         PlayerDTO p2State = state.getPlayers().get(1);
         assertEquals(5, p2State.getMovementLeft(), "P2 deve iniciar o turno com 5 movimentos");
-        assertEquals(2, p2State.getAp(), "P2 deve ter recebido +1 AP base no início de seu turno (total 2)");
+        assertEquals(1, p2State.getAp(), "P2 inicia seu 1º turno com 1 bomba");
     }
 
     @Test
-    @DisplayName("1v1: Acúmulo de AP bônus por não plantar bombas no turno")
-    void testApBonusWhenPassingTurnWithoutBombs() throws Exception {
+    @DisplayName("1v1: Progressão de passos (5, 8, 12...) e bombas por turno (1, 2, 2, 2, 3, 3, 3, 4...)")
+    void testProgressiveMovementAndBombs() throws Exception {
         PlayerDTO p1 = service.conectarJogador("P1");
         PlayerDTO p2 = service.conectarJogador("P2");
 
+        // Turno 1: ambos começam com 1 bomba e 5 passos
         assertEquals(1, p1.getAp());
-        // P1 não planta bomba e confirma turno
-        GameStateDTO state = service.confirmarTurno(p1.getId());
+        assertEquals(5, p1.getMovementLeft());
 
-        // P1 deve ter recebido +1 AP bônus (1 + 1 = 2)
-        PlayerDTO p1After = state.getPlayers().get(0);
-        assertEquals(2, p1After.getAp(), "P1 deve receber +1 AP de bônus por economizar");
+        // P1 confirma Turno 1 -> Vez vai para Turno 1 de P2 (5 passos, 1 bomba)
+        GameStateDTO state = service.confirmarTurno(p1.getId());
+        PlayerDTO p2Turn1 = state.getPlayers().get(1);
+        assertEquals(5, p2Turn1.getMovementLeft(), "P2 no seu 1º turno tem 5 passos");
+        assertEquals(1, p2Turn1.getAp(), "P2 no seu 1º turno tem 1 bomba");
+
+        // P2 confirma Turno 1 -> Vez vai para Turno 2 de P1 (8 passos, 2 bombas)
+        state = service.confirmarTurno(p2.getId());
+        PlayerDTO p1Turn2 = state.getPlayers().get(0);
+        assertEquals(8, p1Turn2.getMovementLeft(), "P1 no seu 2º turno deve ter 8 passos");
+        assertEquals(2, p1Turn2.getAp(), "P1 no seu 2º turno tem 2 bombas");
+
+        // P1 confirma Turno 2 -> Vez vai para Turno 2 de P2 (8 passos, 2 bombas)
+        state = service.confirmarTurno(p1.getId());
+        PlayerDTO p2Turn2 = state.getPlayers().get(1);
+        assertEquals(8, p2Turn2.getMovementLeft(), "P2 no seu 2º turno deve ter 8 passos");
+        assertEquals(2, p2Turn2.getAp(), "P2 no seu 2º turno tem 2 bombas");
+
+        // P2 confirma Turno 2 -> Vez vai para Turno 3 de P1 (12 passos, 2 bombas)
+        state = service.confirmarTurno(p2.getId());
+        PlayerDTO p1Turn3 = state.getPlayers().get(0);
+        assertEquals(12, p1Turn3.getMovementLeft(), "P1 no seu 3º turno deve ter 12 passos");
+        assertEquals(2, p1Turn3.getAp(), "P1 no seu 3º turno tem 2 bombas");
+
+        // P1 confirma Turno 3 -> Vez vai para Turno 3 de P2 (12 passos, 2 bombas)
+        state = service.confirmarTurno(p1.getId());
+
+        // P2 confirma Turno 3 -> Vez vai para Turno 4 de P1 (17 passos, 2 bombas)
+        state = service.confirmarTurno(p2.getId());
+        PlayerDTO p1Turn4 = state.getPlayers().get(0);
+        assertEquals(17, p1Turn4.getMovementLeft(), "P1 no seu 4º turno deve ter 17 passos");
+        assertEquals(2, p1Turn4.getAp(), "P1 no seu 4º turno tem 2 bombas");
+
+        // P1 confirma Turno 4 -> Turno 4 de P2 -> P2 confirma Turno 4 -> Turno 5 de P1 (23 passos, 3 bombas)
+        service.confirmarTurno(p1.getId());
+        state = service.confirmarTurno(p2.getId());
+        PlayerDTO p1Turn5 = state.getPlayers().get(0);
+        assertEquals(23, p1Turn5.getMovementLeft(), "P1 no seu 5º turno deve ter 23 passos");
+        assertEquals(3, p1Turn5.getAp(), "P1 no seu 5º turno tem 3 bombas");
+
+        //Valida fórmula direta para Turnos 6, 7 e 8
+        assertEquals(3, PlayerDTO.calculateBombAllowanceForTurn(6));
+        assertEquals(3, PlayerDTO.calculateBombAllowanceForTurn(7));
+        assertEquals(4, PlayerDTO.calculateBombAllowanceForTurn(8));
     }
 
     @Test
