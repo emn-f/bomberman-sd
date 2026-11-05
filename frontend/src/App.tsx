@@ -3,7 +3,7 @@ import { BridgeApi } from './api';
 import { GameBoardCanvas } from './components/GameBoardCanvas';
 import { HUD } from './components/HUD';
 import { Direction, GameStateDTO, PlayerDTO } from './types';
-import { Wifi, Flame, UserCheck, RefreshCw, LogOut } from 'lucide-react';
+import { ArrowRight, RefreshCw, Power, ShieldAlert } from 'lucide-react';
 
 export const App: React.FC = () => {
   const [bridgeUrl, setBridgeUrl] = useState<string>('http://localhost:8081');
@@ -34,7 +34,7 @@ export const App: React.FC = () => {
   const handleConnect = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!playerName.trim()) {
-      showError('Por favor, informe seu nome.');
+      showError('Por favor, informe seu apelido.');
       return;
     }
 
@@ -134,8 +134,9 @@ export const App: React.FC = () => {
       try {
         const state = await apiRef.current.getState();
         if (isMounted) {
-          // Se o jogador local foi removido do servidor (ex: partida reiniciada por nova conexão), volta ao lobby
-          const stillInMatch = state.players.some(p => p.id === localPlayer.id && p.nome === localPlayer.nome);
+          const stillInMatch = state.players.some(
+            p => p.id === localPlayer.id && p.nome === localPlayer.nome
+          );
           if (!stillInMatch && state.status !== 'FINISHED') {
             setLocalPlayer(null);
             setGameState(null);
@@ -144,7 +145,7 @@ export const App: React.FC = () => {
           setGameState(state);
         }
       } catch (err) {
-        // Silently keep polling or log
+        // Silently keep polling
       }
     }, 300);
 
@@ -157,7 +158,6 @@ export const App: React.FC = () => {
   // Keyboard controls listener (WASD, Arrows, Space, Enter)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Don't intercept typing in input fields
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
         return;
       }
@@ -192,128 +192,206 @@ export const App: React.FC = () => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [localPlayer, gameState, handleMove, handlePlantBomb, handleConfirmTurn]);
 
+  const isPort8081 = bridgeUrl.includes('8081');
+  const isPort8082 = bridgeUrl.includes('8082');
+
+  const isMyTurn =
+    gameState?.status === 'IN_PROGRESS' &&
+    localPlayer &&
+    gameState.currentTurnPlayerId === localPlayer.id;
+
+  const currentPlayer = gameState?.players.find(p => p.id === gameState.currentTurnPlayerId);
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-950 via-slate-900 to-indigo-950 text-gray-100 flex flex-col font-sans">
-      {/* Top Navbar */}
-      <header className="border-b border-gray-800/80 bg-gray-950/80 backdrop-blur-md px-6 py-3.5 flex flex-wrap items-center justify-between gap-4 sticky top-0 z-50">
-        <div className="flex items-center gap-3">
-          <div className="p-2 bg-gradient-to-tr from-amber-500 to-rose-500 rounded-xl shadow-lg shadow-rose-950/50">
-            <Flame className="w-5 h-5 text-white animate-bounce" />
-          </div>
-          <div>
-            <h1 className="text-base font-black tracking-wide bg-gradient-to-r from-amber-300 via-rose-300 to-indigo-300 bg-clip-text text-transparent font-arcade">
-              BOMBERMAN 1v1
-            </h1>
-            <p className="text-[10px] text-gray-400 font-mono">Sistemas Distribuídos • Java RMI + Bridge REST</p>
-          </div>
+    <div className="min-h-screen bg-surface-container-lowest text-on-surface flex flex-col justify-between micro-dot-bg selection:bg-primary-container selection:text-surface-container-lowest">
+      {/* Header Minimalista */}
+      <header className="w-full h-14 px-6 flex items-center justify-between border-b border-outline-variant/30 bg-surface-container-lowest/80 backdrop-blur-md sticky top-0 z-50">
+        <div className="flex items-center gap-2">
+          <span className="text-primary-container font-telemetry-md text-telemetry-md">❖</span>
+          <span className="font-headline-sm text-headline-sm font-bold tracking-wider text-on-surface uppercase">
+            BOMBERMAN <span className="text-primary-container">1v1</span>
+          </span>
         </div>
 
-        {/* Bridge URL Configuration */}
-        <div className="flex items-center gap-2 bg-gray-900/80 p-1.5 px-3 rounded-xl border border-gray-800 text-xs">
-          <Wifi className="w-3.5 h-3.5 text-indigo-400" />
-          <span className="text-gray-400 font-medium">Bridge URL:</span>
-          <input
-            type="text"
-            value={bridgeUrl}
-            onChange={(e) => handleBridgeUrlChange(e.target.value)}
-            disabled={!!localPlayer}
-            placeholder="http://localhost:8081"
-            className="bg-gray-800 text-indigo-200 px-2 py-1 rounded border border-gray-700 w-44 font-mono text-xs focus:outline-none focus:border-indigo-500 disabled:opacity-60"
-          />
+        <div className="flex items-center gap-3 font-telemetry-sm text-telemetry-sm text-on-surface-variant">
+          <span className="flex items-center gap-2">
+            <span className="inline-block w-2 h-2 rounded-full bg-primary-container animate-pulse" />
+            <span className="tracking-wide hidden sm:inline">
+              {localPlayer
+                ? `${localPlayer.nome} (${localPlayer.id}) • ${bridgeUrl}`
+                : `BRIDGE ${isPort8081 ? ':8081' : ':8082'} • PRONTO`}
+            </span>
+          </span>
+
           {localPlayer && (
             <button
               onClick={handleDisconnect}
-              title="Desconectar do jogo"
-              className="ml-2 flex items-center gap-1 px-2.5 py-1 bg-rose-600/20 hover:bg-rose-600/30 text-rose-300 border border-rose-500/30 rounded text-xs transition"
+              title="Sair da partida"
+              className="flex items-center gap-1 px-2.5 py-1 bg-error-container/80 text-on-error-container border border-on-tertiary-container rounded text-xs hover:bg-on-tertiary-container hover:text-tertiary transition-colors"
             >
-              <LogOut className="w-3 h-3" /> Sair
+              <Power className="w-3.5 h-3.5" />
+              <span>Sair</span>
             </button>
           )}
         </div>
       </header>
 
-      {/* Main Game Arena */}
-      <main className="flex-1 flex flex-col items-center justify-center p-4 md:p-6 max-w-7xl mx-auto w-full">
-        {!localPlayer ? (
-          /* Join Game Modal / Screen */
-          <div className="w-full max-w-md p-8 bg-gray-900/90 backdrop-blur-xl rounded-3xl border border-indigo-500/30 shadow-2xl shadow-indigo-950/60 text-center animate-fade-in">
-            <div className="w-16 h-16 bg-gradient-to-tr from-amber-500 to-indigo-600 rounded-2xl flex items-center justify-center mx-auto mb-5 shadow-lg shadow-indigo-900/50">
-              <UserCheck className="w-8 h-8 text-white" />
+      {/* Main Content */}
+      {!localPlayer ? (
+        /* Lobby Minimalista */
+        <main className="flex-1 flex items-center justify-center px-4 py-10">
+          <div className="w-full max-w-[420px] bg-surface-container/90 border border-outline-variant/60 rounded-lg p-8 backdrop-blur-md shadow-2xl relative">
+            {/* Cantoneiras sutis */}
+            <div className="absolute -top-px -left-px w-2.5 h-2.5 border-t-2 border-l-2 border-primary-container" />
+            <div className="absolute -bottom-px -right-px w-2.5 h-2.5 border-b-2 border-r-2 border-primary-container" />
+
+            {/* Cabeçalho do Card */}
+            <div className="text-center mb-6">
+              <h1 className="font-headline-lg text-3xl font-bold text-on-surface tracking-tight">
+                Bomberman 1v1
+              </h1>
+              <p className="font-body-md text-sm text-on-surface-variant mt-1.5">
+                Escolha sua porta e informe seu apelido para jogar
+              </p>
             </div>
 
-            <h2 className="text-xl font-black text-gray-100 font-arcade mb-2">ENTRAR NA PARTIDA</h2>
-            <p className="text-xs text-gray-400 mb-6">
-              Insira seu apelido para conectar ao Bridge local e entrar no grid 9x9.
-            </p>
-
             {errorMessage && (
-              <div className="mb-4 p-3 bg-rose-500/10 border border-rose-500/40 text-rose-300 text-xs rounded-xl text-left">
-                {errorMessage}
+              <div className="mb-5 p-3 bg-error-container/40 border border-on-tertiary-container rounded text-on-error-container font-telemetry-sm text-xs flex items-center gap-2">
+                <ShieldAlert className="w-4 h-4 shrink-0 text-error" />
+                <span>{errorMessage}</span>
               </div>
             )}
 
-            <form onSubmit={handleConnect} className="flex flex-col gap-4 text-left">
+            {/* Formulário Minimalista */}
+            <form onSubmit={handleConnect} className="space-y-5">
+              {/* Segmented Control: Escolha de Jogador e Porta */}
               <div>
-                <label className="text-xs font-bold text-gray-300 mb-1 block">Apelido do Jogador</label>
-                <input
-                  type="text"
-                  value={playerName}
-                  onChange={(e) => setPlayerName(e.target.value)}
-                  placeholder="Ex: Bomberman Azul"
-                  maxLength={16}
-                  className="w-full px-4 py-3 bg-gray-800 text-gray-100 rounded-xl border border-gray-700 focus:outline-none focus:border-indigo-500 font-bold"
-                  autoFocus
-                />
+                <label className="block font-telemetry-sm text-telemetry-sm text-on-surface-variant uppercase mb-1.5 tracking-wider">
+                  Alocação de Porta
+                </label>
+                <div className="grid grid-cols-2 gap-1.5 p-1 bg-surface-container-lowest border border-outline-variant/40 rounded">
+                  <button
+                    type="button"
+                    onClick={() => handleBridgeUrlChange('http://localhost:8081')}
+                    className={`py-2.5 px-3 font-telemetry-md text-telemetry-md text-center rounded transition-all duration-150 ${
+                      isPort8081
+                        ? 'bg-surface-container-high text-primary-container border border-primary-container/40 shadow-sm font-semibold'
+                        : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-container'
+                    }`}
+                  >
+                    Jogador 1 (:8081)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleBridgeUrlChange('http://localhost:8082')}
+                    className={`py-2.5 px-3 font-telemetry-md text-telemetry-md text-center rounded transition-all duration-150 ${
+                      isPort8082
+                        ? 'bg-surface-container-high text-primary-container border border-primary-container/40 shadow-sm font-semibold'
+                        : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-container'
+                    }`}
+                  >
+                    Jogador 2 (:8082)
+                  </button>
+                </div>
               </div>
 
-              <div className="text-[11px] text-gray-400 bg-gray-950/60 p-3 rounded-xl border border-gray-800/80">
-                💡 <span className="font-semibold text-gray-300">Dica Multi-Aba:</span> Suba o <code className="text-indigo-300 font-mono">Bridge 1</code> na porta <code className="text-indigo-300 font-mono">8081</code> e o <code className="text-indigo-300 font-mono">Bridge 2</code> na porta <code className="text-indigo-300 font-mono">8082</code> para jogar em duas abas!
+              {/* Campo de Texto: Apelido */}
+              <div>
+                <label
+                  htmlFor="nickname"
+                  className="block font-telemetry-sm text-telemetry-sm text-on-surface-variant uppercase mb-1.5 tracking-wider"
+                >
+                  Seu Apelido
+                </label>
+                <div className="relative">
+                  <input
+                    id="nickname"
+                    type="text"
+                    value={playerName}
+                    onChange={(e) => setPlayerName(e.target.value)}
+                    placeholder="Ex: BLASTER_01"
+                    maxLength={16}
+                    autoFocus
+                    className="w-full bg-surface-container-lowest border border-outline-variant/60 focus:border-primary-container focus:ring-1 focus:ring-primary-container rounded px-4 py-2.5 font-telemetry-md text-telemetry-md text-on-surface placeholder:text-on-surface-variant/40 transition-colors outline-none"
+                  />
+                  <span className="absolute right-3 top-2.5 text-on-surface-variant/40 font-telemetry-sm text-telemetry-sm select-none">
+                    _
+                  </span>
+                </div>
               </div>
 
+              {/* Botão Primário: Entrar na Partida */}
               <button
                 type="submit"
                 disabled={isConnecting}
-                className="mt-2 w-full py-3.5 px-4 bg-gradient-to-r from-indigo-600 via-indigo-500 to-purple-600 hover:from-indigo-500 hover:to-purple-500 active:scale-[0.98] text-white font-black text-sm uppercase tracking-wider rounded-xl shadow-xl shadow-indigo-950/60 flex items-center justify-center gap-2 transition disabled:opacity-50"
+                className="w-full py-3 px-4 bg-primary-container text-surface-container-lowest font-headline-sm text-headline-sm font-bold chamfer-btn glow-cyan transition-all duration-150 active:scale-[0.98] flex items-center justify-center gap-2 disabled:opacity-50"
               >
                 {isConnecting ? (
                   <>
-                    <RefreshCw className="w-4 h-4 animate-spin" /> Conectando...
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                    <span>Conectando...</span>
                   </>
                 ) : (
-                  'Conectar e Jogar'
+                  <>
+                    <span>Entrar na Partida</span>
+                    <ArrowRight className="w-4 h-4" />
+                  </>
                 )}
               </button>
             </form>
           </div>
-        ) : (
-          /* Active Game View: Board Canvas + HUD */
-          <div className="flex flex-col lg:flex-row items-center lg:items-start justify-center gap-6 w-full max-w-5xl">
-            {/* Canvas Board (9x9) */}
-            <div className="flex flex-col items-center">
-              <GameBoardCanvas gameState={gameState} localPlayer={localPlayer} />
-              <div className="mt-2 text-center text-xs text-gray-400 font-mono">
-                Teclas: <span className="text-amber-300 font-bold">WASD / Setas</span> (Mover) • <span className="text-amber-300 font-bold">Espaço</span> (Bomba) • <span className="text-emerald-400 font-bold">Enter</span> (Confirmar)
+        </main>
+      ) : (
+        /* Arena de Combate */
+        <main className="flex-1 flex flex-col lg:flex-row items-center lg:items-start justify-center gap-6 p-4 lg:p-6 max-w-6xl mx-auto w-full">
+          {/* Coluna Esquerda: Tabuleiro 9x9 */}
+          <section className="flex flex-col items-center">
+            {/* Barra de Status Compacta Acima do Tabuleiro */}
+            <div className="w-full bg-surface-container border border-outline-variant/60 px-3.5 py-2 mb-3 flex items-center justify-between gap-2 rounded-t">
+              <div className="flex items-center gap-2">
+                <span className="px-2 py-0.5 bg-surface-container-lowest border border-primary-container/60 font-telemetry-md text-xs text-primary-container font-bold">
+                  TURNO #{String(gameState?.turnNumber || 1).padStart(2, '0')}
+                </span>
+                <span className="font-telemetry-sm text-xs text-on-surface-variant">
+                  {gameState?.status === 'WAITING_FOR_PLAYERS' && '⏳ Aguardando Jogador 2'}
+                  {gameState?.status === 'IN_PROGRESS' && '⚔️ Em Combate'}
+                  {gameState?.status === 'FINISHED' && '🏆 Partida Finalizada'}
+                </span>
               </div>
+
+              {gameState?.status === 'IN_PROGRESS' && (
+                <span
+                  className={`px-2.5 py-0.5 font-telemetry-sm text-xs font-bold ${
+                    isMyTurn
+                      ? 'bg-primary-container text-surface-container-lowest'
+                      : 'bg-surface-container-lowest text-on-surface-variant border border-outline-variant/50'
+                  }`}
+                >
+                  {isMyTurn ? 'SUA VEZ!' : `Vez de ${currentPlayer?.nome || 'Oponente'}`}
+                </span>
+              )}
             </div>
 
-            {/* Sidebar HUD */}
-            <HUD
-              gameState={gameState}
-              localPlayer={localPlayer}
-              onMove={handleMove}
-              onPlantBomb={handlePlantBomb}
-              onConfirmTurn={handleConfirmTurn}
-              onRestartMatch={handleRestartMatch}
-              isActionLoading={isActionLoading}
-              errorMessage={errorMessage}
-            />
-          </div>
-        )}
-      </main>
+            <GameBoardCanvas gameState={gameState} localPlayer={localPlayer} />
+          </section>
 
-      {/* Footer */}
-      <footer className="border-t border-gray-900 bg-gray-950/60 py-2.5 px-6 text-center text-[11px] text-gray-500">
-        Trabalho Prático de Sistemas Distribuídos • Java RMI + JRMP + HTTP Bridge + React Canvas
+          {/* Coluna Direita: HUD */}
+          <HUD
+            gameState={gameState}
+            localPlayer={localPlayer}
+            onMove={handleMove}
+            onPlantBomb={handlePlantBomb}
+            onConfirmTurn={handleConfirmTurn}
+            onRestartMatch={handleRestartMatch}
+            isActionLoading={isActionLoading}
+            errorMessage={errorMessage}
+          />
+        </main>
+      )}
+
+      {/* Rodapé Ultraleve */}
+      <footer className="w-full py-2.5 text-center font-telemetry-sm text-telemetry-sm text-on-surface-variant/40 select-none">
+        <span>SISTEMAS DISTRIBUÍDOS // JAVA RMI</span>
       </footer>
     </div>
   );
