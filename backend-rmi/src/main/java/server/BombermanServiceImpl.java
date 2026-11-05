@@ -89,32 +89,40 @@ public class BombermanServiceImpl extends UnicastRemoteObject implements IBomber
     public PlayerDTO conectarJogador(String nome) throws RemoteException, GameFullException {
         lock.lock();
         try {
+            // Se a partida anterior já havia terminado, limpa e prepara uma nova sala automaticamente
+            if (status == GameStatusEnum.FINISHED) {
+                resetMatchInternal();
+            }
+
             if (players.size() >= REQUIRED_PLAYERS) {
                 throw new GameFullException("Partida lotada. Limite estrito de " + REQUIRED_PLAYERS + " jogadores (1v1).");
             }
-            if (status == GameStatusEnum.FINISHED) {
-                throw new GameFullException("Partida já finalizada.");
-            }
 
-            int index = players.size();
-            int spawnX = SPAWN_COORDS[index][0];
-            int spawnY = SPAWN_COORDS[index][1];
+            // Garante o menor ID disponível ("P1" ou "P2") mesmo que alguém tenha saído antes de começar
+            boolean p1Occupied = players.stream().anyMatch(p -> "P1".equals(p.getId()));
+            int slotIndex = p1Occupied ? 1 : 0;
+            int spawnX = SPAWN_COORDS[slotIndex][0];
+            int spawnY = SPAWN_COORDS[slotIndex][1];
 
-            String id = "P" + (index + 1);
-            String finalNome = (nome != null && !nome.isBlank()) ? nome.trim() : "Jogador " + (index + 1);
+            String id = "P" + (slotIndex + 1);
+            String finalNome = (nome != null && !nome.isBlank()) ? nome.trim() : "Jogador " + (slotIndex + 1);
             PlayerDTO newPlayer = new PlayerDTO(id, finalNome, spawnX, spawnY);
-            players.add(newPlayer);
+            if (slotIndex == 0 && !players.isEmpty()) {
+                players.add(0, newPlayer);
+            } else {
+                players.add(newPlayer);
+            }
 
             if (players.size() == 1) {
                 status = GameStatusEnum.WAITING_FOR_PLAYERS;
                 currentTurnPlayerId = null;
-                lastActionMessage = newPlayer.getNome() + " conectou-se como P1 (" + spawnX + "," + spawnY + "). Aguardando P2...";
+                lastActionMessage = newPlayer.getNome() + " conectou-se como " + id + " (" + spawnX + "," + spawnY + "). Aguardando oponente...";
             } else if (players.size() == 2) {
                 // Auto-start 1v1 match
                 status = GameStatusEnum.IN_PROGRESS;
                 currentTurnPlayerId = players.get(0).getId(); // P1 starts
                 turnNumber = 1;
-                lastActionMessage = newPlayer.getNome() + " conectou-se como P2 (" + spawnX + "," + spawnY + "). Partida 1v1 iniciada! Vez de " + players.get(0).getNome() + ".";
+                lastActionMessage = newPlayer.getNome() + " conectou-se como " + id + " (" + spawnX + "," + spawnY + "). Partida 1v1 iniciada! Vez de " + players.get(0).getNome() + ".";
             }
 
             return clonePlayer(newPlayer);
@@ -348,10 +356,63 @@ public class BombermanServiceImpl extends UnicastRemoteObject implements IBomber
                 players.remove(disconnected);
                 currentTurnPlayerId = null;
                 lastActionMessage = disconnected.getNome() + " desconectou-se antes do início. Aguardando jogadores...";
+            } else if (status == GameStatusEnum.FINISHED) {
+                players.remove(disconnected);
+                if (players.isEmpty()) {
+                    resetMatchInternal();
+                }
             }
         } finally {
             lock.unlock();
         }
+    }
+
+    @Override
+    public GameStateDTO reiniciarPartida() throws RemoteException {
+        lock.lock();
+        try {
+            activeBombCoords.clear();
+            fireOnBoard = false;
+            initializeBoard(new Random());
+
+            if (players.size() == REQUIRED_PLAYERS) {
+                for (int i = 0; i < players.size(); i++) {
+                    PlayerDTO p = players.get(i);
+                    p.setId("P" + (i + 1));
+                    p.setX(SPAWN_COORDS[i][0]);
+                    p.setY(SPAWN_COORDS[i][1]);
+                    p.setVivo(true);
+                    p.setAp(PlayerDTO.INITIAL_AP);
+                    p.setMovementLeft(PlayerDTO.INITIAL_MOVEMENT);
+                    p.setBombsPlantedThisTurn(0);
+                }
+                status = GameStatusEnum.IN_PROGRESS;
+                currentTurnPlayerId = players.get(0).getId();
+                winnerId = null;
+                winnerName = null;
+                turnNumber = 1;
+                lastActionMessage = "Revanche iniciada! Tabuleiro resetado. Vez de " + players.get(0).getNome() + ".";
+            } else {
+                resetMatchInternal();
+            }
+
+            return snapshot();
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    private void resetMatchInternal() {
+        players.clear();
+        activeBombCoords.clear();
+        fireOnBoard = false;
+        currentTurnPlayerId = null;
+        status = GameStatusEnum.WAITING_FOR_PLAYERS;
+        winnerId = null;
+        winnerName = null;
+        turnNumber = 0;
+        lastActionMessage = "Partida reiniciada. Aguardando 2 jogadores conectarem...";
+        initializeBoard(new Random());
     }
 
     private void clearFireIfAny() {

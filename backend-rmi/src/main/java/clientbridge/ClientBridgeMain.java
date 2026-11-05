@@ -19,6 +19,20 @@ public class ClientBridgeMain {
 
     private static final Gson gson = new Gson();
     private static IBombermanService bombermanService;
+    private static String rmiUri;
+
+    private static synchronized IBombermanService getService() throws Exception {
+        if (bombermanService == null) {
+            bombermanService = (IBombermanService) Naming.lookup(rmiUri);
+        }
+        return bombermanService;
+    }
+
+    private static synchronized IBombermanService refreshService() throws Exception {
+        System.out.println("[Lookup] Reconectando ao servidor RMI em " + rmiUri + "...");
+        bombermanService = (IBombermanService) Naming.lookup(rmiUri);
+        return bombermanService;
+    }
 
     public static void main(String[] args) {
         String rmiHost = System.getenv().getOrDefault("RMI_HOST", "localhost");
@@ -59,7 +73,7 @@ public class ClientBridgeMain {
 
         try {
             // Lookup RMI Remote Stub
-            String rmiUri = "rmi://" + rmiHost + ":" + rmiPort + "/BombermanService";
+            rmiUri = "rmi://" + rmiHost + ":" + rmiPort + "/BombermanService";
             System.out.println("[Lookup] Conectando ao servidor RMI em " + rmiUri + "...");
             bombermanService = (IBombermanService) Naming.lookup(rmiUri);
             System.out.println("[Lookup] Stub remoto obtido com sucesso!");
@@ -75,6 +89,7 @@ public class ClientBridgeMain {
             server.createContext("/api/confirm", new ConfirmHandler());
             server.createContext("/api/state", new StateHandler());
             server.createContext("/api/disconnect", new DisconnectHandler());
+            server.createContext("/api/restart", new RestartHandler());
 
             server.start();
             System.out.println("[Bridge HTTP] Servidor HTTP local ativo em http://localhost:" + httpPort);
@@ -85,6 +100,7 @@ public class ClientBridgeMain {
             System.out.println("  POST /api/confirm    -> Confirmar turno e detonar");
             System.out.println("  GET  /api/state      -> Obter estado completo");
             System.out.println("  POST /api/disconnect -> Desconectar jogador");
+            System.out.println("  POST /api/restart    -> Reiniciar partida / revanche");
             System.out.println("[Aviso] Pressione Ctrl+C para encerrar o bridge.");
             System.out.println("==================================================");
 
@@ -155,8 +171,13 @@ public class ClientBridgeMain {
                 JsonObject json = gson.fromJson(body, JsonObject.class);
                 String nome = (json != null && json.has("nome")) ? json.get("nome").getAsString() : "Jogador";
 
-                PlayerDTO player = bombermanService.conectarJogador(nome);
-                sendJsonResponse(exchange, 200, player);
+                try {
+                    PlayerDTO player = getService().conectarJogador(nome);
+                    sendJsonResponse(exchange, 200, player);
+                } catch (java.rmi.RemoteException re) {
+                    PlayerDTO player = refreshService().conectarJogador(nome);
+                    sendJsonResponse(exchange, 200, player);
+                }
             } catch (GameFullException e) {
                 sendErrorResponse(exchange, 409, e.getMessage());
             } catch (Exception e) {
@@ -264,8 +285,13 @@ public class ClientBridgeMain {
             }
 
             try {
-                GameStateDTO state = bombermanService.obterEstadoJogo();
-                sendJsonResponse(exchange, 200, state);
+                try {
+                    GameStateDTO state = getService().obterEstadoJogo();
+                    sendJsonResponse(exchange, 200, state);
+                } catch (java.rmi.RemoteException re) {
+                    GameStateDTO state = refreshService().obterEstadoJogo();
+                    sendJsonResponse(exchange, 200, state);
+                }
             } catch (Exception e) {
                 sendErrorResponse(exchange, 500, "Erro interno ao obter estado: " + e.getMessage());
             }
@@ -293,6 +319,29 @@ public class ClientBridgeMain {
                 sendJsonResponse(exchange, 200, res);
             } catch (Exception e) {
                 sendErrorResponse(exchange, 500, "Erro ao desconectar: " + e.getMessage());
+            }
+        }
+    }
+
+    static class RestartHandler implements HttpHandler {
+        @Override
+        public void handle(HttpExchange exchange) throws IOException {
+            if (handlePreflight(exchange)) return;
+            if (!"POST".equalsIgnoreCase(exchange.getRequestMethod())) {
+                sendErrorResponse(exchange, 405, "Método não permitido. Utilize POST.");
+                return;
+            }
+
+            try {
+                try {
+                    GameStateDTO state = getService().reiniciarPartida();
+                    sendJsonResponse(exchange, 200, state);
+                } catch (java.rmi.RemoteException re) {
+                    GameStateDTO state = refreshService().reiniciarPartida();
+                    sendJsonResponse(exchange, 200, state);
+                }
+            } catch (Exception e) {
+                sendErrorResponse(exchange, 500, "Erro ao reiniciar partida: " + e.getMessage());
             }
         }
     }
