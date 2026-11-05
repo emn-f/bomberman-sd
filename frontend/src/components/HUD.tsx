@@ -33,6 +33,7 @@ export const HUD: React.FC<HUDProps> = ({
 
   const apCount = myPlayerInState?.ap ?? 0;
   const movementLeft = myPlayerInState?.movementLeft ?? 0;
+  const maxMovement = myPlayerInState?.maxMovement ?? 5;
 
   return (
     <div className="hud-panel flex flex-col gap-4 w-full max-w-md bg-gray-900/90 backdrop-blur-md p-5 rounded-2xl border border-gray-800 shadow-xl text-gray-100">
@@ -165,11 +166,13 @@ export const HUD: React.FC<HUDProps> = ({
               <div className="mt-2 text-xs text-gray-400 flex flex-col gap-0.5">
                 <div className="flex justify-between">
                   <span>Estoque AP:</span>
-                  <span className="font-bold text-amber-400">{'💣'.repeat(p.ap) || '0'}</span>
+                  <span className="font-bold text-amber-400">
+                    {p.ap > 5 ? `💣 x${p.ap}` : ('💣'.repeat(p.ap) || '0')}
+                  </span>
                 </div>
                 <div className="flex justify-between">
                   <span>Passos Restantes:</span>
-                  <span className="font-bold text-emerald-400">{p.movementLeft} / 5</span>
+                  <span className="font-bold text-emerald-400">{p.movementLeft} / {p.maxMovement ?? 5}</span>
                 </div>
               </div>
             </div>
@@ -185,7 +188,7 @@ export const HUD: React.FC<HUDProps> = ({
               <Bomb className="w-3.5 h-3.5 text-amber-400" /> AP (Bombas)
             </span>
             <span className="text-lg font-black text-amber-400">
-              {apCount} <span className="text-xs font-normal text-gray-500">/ 5</span>
+              {apCount}
             </span>
           </div>
 
@@ -196,7 +199,7 @@ export const HUD: React.FC<HUDProps> = ({
               <Footprints className="w-3.5 h-3.5 text-emerald-400" /> Passos Turno
             </span>
             <span className="text-lg font-black text-emerald-400">
-              {movementLeft} <span className="text-xs font-normal text-gray-500">/ 5</span>
+              {movementLeft} <span className="text-xs font-normal text-gray-500">/ {maxMovement}</span>
             </span>
           </div>
         </div>

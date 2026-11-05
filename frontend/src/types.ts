@@ -10,6 +10,8 @@ export interface PlayerDTO {
   vivo: boolean;
   ap: number;
   movementLeft: number;
+  maxMovement?: number;
+  turnsPlayed?: number;
   bombsPlantedThisTurn: number;
 }
 
