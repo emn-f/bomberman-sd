@@ -85,67 +85,58 @@ public class BombermanGameTest {
         // Valida que bomba explodiu (virou CELL_FIRE) e destruiu bloco em (0, 2)
         assertEquals(GameStateDTO.CELL_FIRE, state.getBoard()[0][1]);
 
-        // Toggle direto para P2 (1º turno de P2: 5 movimentos e 1 bomba inicial)
+        // Toggle direto para P2 (4 movimentos e 1 bomba por turno)
         assertEquals(p2.getId(), state.getCurrentTurnPlayerId(), "O turno deve ter alternado diretamente para P2");
         PlayerDTO p2State = state.getPlayers().get(1);
-        assertEquals(5, p2State.getMovementLeft(), "P2 deve iniciar o turno com 5 movimentos");
+        assertEquals(4, p2State.getMovementLeft(), "P2 deve iniciar o turno com 4 movimentos");
         assertEquals(1, p2State.getAp(), "P2 inicia seu 1º turno com 1 bomba");
     }
 
     @Test
-    @DisplayName("1v1: Progressão de passos (5, 8, 12...) e bombas por turno (1, 2, 2, 2, 3, 3, 3, 4...)")
-    void testProgressiveMovementAndBombs() throws Exception {
+    @DisplayName("1v1: Mantém 4 movimentos e limita a 1 bomba em todos os turnos")
+    void testFixedMovementAndOneBombPerTurn() throws Exception {
         PlayerDTO p1 = service.conectarJogador("P1");
         PlayerDTO p2 = service.conectarJogador("P2");
 
-        // Turno 1: ambos começam com 1 bomba e 5 passos
+        assertEquals(4, p1.getMovementLeft());
+        assertEquals(4, p1.getMaxMovement());
         assertEquals(1, p1.getAp());
-        assertEquals(5, p1.getMovementLeft());
+        assertEquals(4, p2.getMovementLeft());
+        assertEquals(1, p2.getAp());
 
-        // P1 confirma Turno 1 -> Vez vai para Turno 1 de P2 (5 passos, 1 bomba)
-        GameStateDTO state = service.confirmarTurno(p1.getId());
-        PlayerDTO p2Turn1 = state.getPlayers().get(1);
-        assertEquals(5, p2Turn1.getMovementLeft(), "P2 no seu 1º turno tem 5 passos");
-        assertEquals(1, p2Turn1.getAp(), "P2 no seu 1º turno tem 1 bomba");
+        for (int x = 1; x <= 4; x++) {
+            service.setCell(x, 0, GameStateDTO.CELL_EMPTY);
+        }
+        service.setCell(3, 1, GameStateDTO.CELL_EMPTY);
 
-        // P2 confirma Turno 1 -> Vez vai para Turno 2 de P1 (8 passos, 2 bombas)
-        state = service.confirmarTurno(p2.getId());
-        PlayerDTO p1Turn2 = state.getPlayers().get(0);
-        assertEquals(8, p1Turn2.getMovementLeft(), "P1 no seu 2º turno deve ter 8 passos");
-        assertEquals(2, p1Turn2.getAp(), "P1 no seu 2º turno tem 2 bombas");
+        service.mover(p1.getId(), DirectionEnum.RIGHT);
+        service.mover(p1.getId(), DirectionEnum.RIGHT);
+        GameStateDTO state = service.plantarBomba(p1.getId());
+        PlayerDTO p1State = state.getPlayers().get(0);
+        assertEquals(0, p1State.getAp());
+        assertEquals(1, p1State.getBombsPlantedThisTurn());
+        assertThrows(InsufficientApException.class, () -> service.plantarBomba(p1.getId()));
 
-        // P1 confirma Turno 2 -> Vez vai para Turno 2 de P2 (8 passos, 2 bombas)
+        service.mover(p1.getId(), DirectionEnum.RIGHT);
+        service.mover(p1.getId(), DirectionEnum.DOWN);
+        state = service.obterEstadoJogo();
+        assertEquals(0, state.getPlayers().get(0).getMovementLeft());
+        assertThrows(NoMovementLeftException.class, () -> service.mover(p1.getId(), DirectionEnum.DOWN));
+
         state = service.confirmarTurno(p1.getId());
-        PlayerDTO p2Turn2 = state.getPlayers().get(1);
-        assertEquals(8, p2Turn2.getMovementLeft(), "P2 no seu 2º turno deve ter 8 passos");
-        assertEquals(2, p2Turn2.getAp(), "P2 no seu 2º turno tem 2 bombas");
+        PlayerDTO p2Turn = state.getPlayers().get(1);
+        assertEquals(p2.getId(), state.getCurrentTurnPlayerId());
+        assertEquals(4, p2Turn.getMovementLeft());
+        assertEquals(4, p2Turn.getMaxMovement());
+        assertEquals(1, p2Turn.getAp());
 
-        // P2 confirma Turno 2 -> Vez vai para Turno 3 de P1 (12 passos, 2 bombas)
         state = service.confirmarTurno(p2.getId());
-        PlayerDTO p1Turn3 = state.getPlayers().get(0);
-        assertEquals(12, p1Turn3.getMovementLeft(), "P1 no seu 3º turno deve ter 12 passos");
-        assertEquals(2, p1Turn3.getAp(), "P1 no seu 3º turno tem 2 bombas");
-
-        // P1 confirma Turno 3 -> Vez vai para Turno 3 de P2 (12 passos, 2 bombas)
-        state = service.confirmarTurno(p1.getId());
-
-        // P2 confirma Turno 3 -> Vez vai para Turno 4 de P1 (17 passos, 2 bombas)
-        state = service.confirmarTurno(p2.getId());
-        PlayerDTO p1Turn4 = state.getPlayers().get(0);
-        assertEquals(17, p1Turn4.getMovementLeft(), "P1 no seu 4º turno deve ter 17 passos");
-        assertEquals(2, p1Turn4.getAp(), "P1 no seu 4º turno tem 2 bombas");
-
-        // P1 confirma Turno 4 -> Turno 4 de P2 -> P2 confirma Turno 4 -> Turno 5 de P1 (23 passos, 3 bombas)
-        service.confirmarTurno(p1.getId());
-        state = service.confirmarTurno(p2.getId());
-        PlayerDTO p1Turn5 = state.getPlayers().get(0);
-        assertEquals(23, p1Turn5.getMovementLeft(), "P1 no seu 5º turno deve ter 23 passos");
-        assertEquals(3, p1Turn5.getAp(), "P1 no seu 5º turno tem 3 bombas");
-
-        //Valida fórmula direta para Turnos 6, 7 e 8
-        assertEquals(3, PlayerDTO.calculateBombAllowanceForTurn(6));
-        assertEquals(3, PlayerDTO.calculateBombAllowanceForTurn(7));
-        assertEquals(4, PlayerDTO.calculateBombAllowanceForTurn(8));
+        PlayerDTO p1NextTurn = state.getPlayers().get(0);
+        assertEquals(p1.getId(), state.getCurrentTurnPlayerId());
+        assertEquals(4, p1NextTurn.getMovementLeft());
+        assertEquals(4, p1NextTurn.getMaxMovement());
+        assertEquals(1, p1NextTurn.getAp());
+        assertEquals(0, p1NextTurn.getBombsPlantedThisTurn());
     }
 
     @Test

@@ -11,7 +11,7 @@ export interface PlayerDTO {
   ap: number;
   movementLeft: number;
   maxMovement?: number;
-  turnsPlayed?: number;
+
   bombsPlantedThisTurn: number;
 }
 

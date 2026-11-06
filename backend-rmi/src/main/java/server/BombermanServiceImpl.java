@@ -197,6 +197,10 @@ public class BombermanServiceImpl extends UnicastRemoteObject implements IBomber
                 throw new InvalidTurnException("Jogador não encontrado ou eliminado.");
             }
 
+            if (player.getBombsPlantedThisTurn() >= PlayerDTO.BASE_BOMBS_PER_TURN) {
+                throw new InsufficientApException("Limite de 1 bomba por turno atingido.");
+            }
+
             if (player.getAp() < 1) {
                 throw new InsufficientApException("Pontos de Ação (AP) insuficientes para plantar bomba.");
             }
@@ -306,19 +310,14 @@ public class BombermanServiceImpl extends UnicastRemoteObject implements IBomber
             } else {
                 // Ambos vivos: Toggle direto entre P1 e P2
                 currentTurnPlayerId = opponent.getId();
-                int nextPlayerTurn = (turnNumber / 2) + 1;
-                int nextMaxMovement = PlayerDTO.calculateMaxMovementForTurn(nextPlayerTurn);
-                int nextBombAllowance = PlayerDTO.calculateBombAllowanceForTurn(nextPlayerTurn);
-                opponent.setTurnsPlayed(nextPlayerTurn);
+                int nextMaxMovement = PlayerDTO.INITIAL_MOVEMENT;
                 opponent.setMaxMovement(nextMaxMovement);
                 opponent.setMovementLeft(nextMaxMovement);
-                opponent.setAp(nextBombAllowance);
+                opponent.setAp(PlayerDTO.INITIAL_AP);
                 opponent.setBombsPlantedThisTurn(0);
                 turnNumber++;
                 report.append("Novo turno: vez de ").append(opponent.getNome())
-                        .append(" (").append(nextMaxMovement).append(" passos, ")
-                        .append(nextBombAllowance).append(nextBombAllowance > 1 ? " bombas" : " bomba")
-                        .append(").");
+                        .append(" (").append(nextMaxMovement).append(" passos, 1 bomba).");
             }
 
             lastActionMessage = report.toString().trim();
@@ -387,7 +386,6 @@ public class BombermanServiceImpl extends UnicastRemoteObject implements IBomber
                     p.setY(SPAWN_COORDS[i][1]);
                     p.setVivo(true);
                     p.setAp(PlayerDTO.INITIAL_AP);
-                    p.setTurnsPlayed(1);
                     p.setMaxMovement(PlayerDTO.INITIAL_MOVEMENT);
                     p.setMovementLeft(PlayerDTO.INITIAL_MOVEMENT);
                     p.setBombsPlantedThisTurn(0);
@@ -471,7 +469,7 @@ public class BombermanServiceImpl extends UnicastRemoteObject implements IBomber
         copy.setAp(src.getAp());
         copy.setMovementLeft(src.getMovementLeft());
         copy.setMaxMovement(src.getMaxMovement());
-        copy.setTurnsPlayed(src.getTurnsPlayed());
+
         copy.setBombsPlantedThisTurn(src.getBombsPlantedThisTurn());
         return copy;
     }

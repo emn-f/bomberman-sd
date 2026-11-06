@@ -5,8 +5,11 @@ import { HUD } from './components/HUD';
 import { Direction, GameStateDTO, PlayerDTO } from './types';
 import { ArrowRight, RefreshCw, Power, ShieldAlert } from 'lucide-react';
 
+const bridgeUrlForPort = (port: number) =>
+  'http://' + (window.location.hostname || 'localhost') + ':' + port;
+
 export const App: React.FC = () => {
-  const [bridgeUrl, setBridgeUrl] = useState<string>('http://localhost:8081');
+  const [bridgeUrl, setBridgeUrl] = useState<string>(bridgeUrlForPort(8081));
   const [playerName, setPlayerName] = useState<string>('');
   const [localPlayer, setLocalPlayer] = useState<PlayerDTO | null>(null);
   const [gameState, setGameState] = useState<GameStateDTO | null>(null);
@@ -272,7 +275,7 @@ export const App: React.FC = () => {
                 <div className="grid grid-cols-2 gap-1.5 p-1 bg-surface-container-lowest border border-outline-variant/40 rounded">
                   <button
                     type="button"
-                    onClick={() => handleBridgeUrlChange('http://localhost:8081')}
+                    onClick={() => handleBridgeUrlChange(bridgeUrlForPort(8081))}
                     className={`py-2.5 px-3 font-telemetry-md text-telemetry-md text-center rounded transition-all duration-150 ${
                       isPort8081
                         ? 'bg-surface-container-high text-primary-container border border-primary-container/40 shadow-sm font-semibold'
@@ -283,7 +286,7 @@ export const App: React.FC = () => {
                   </button>
                   <button
                     type="button"
-                    onClick={() => handleBridgeUrlChange('http://localhost:8082')}
+                    onClick={() => handleBridgeUrlChange(bridgeUrlForPort(8082))}
                     className={`py-2.5 px-3 font-telemetry-md text-telemetry-md text-center rounded transition-all duration-150 ${
                       isPort8082
                         ? 'bg-surface-container-high text-primary-container border border-primary-container/40 shadow-sm font-semibold'

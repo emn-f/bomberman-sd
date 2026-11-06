@@ -91,7 +91,7 @@ Como o cliente descobre em qual porta TCP o objeto remoto está escutando? Atrav
 ### 2.5. Por que existe o `ClientBridgeMain`?
 Se o professor perguntar: *"Por que vocês têm um servidor HTTP dentro do cliente?"*
 - **Resposta certeira:** O Java RMI usa o protocolo binário **JRMP** diretamente sobre sockets TCP. Navegadores Web (onde roda o React/Canvas) possuem uma restrição de segurança (*browser sandbox*) que só permite falar HTTP ou WebSocket, proibindo abrir socket TCP puro para falar JRMP.
-- Portanto, o `ClientBridgeMain` **é o nosso Cliente RMI Java nativo**. Ele faz o `Naming.lookup`, segura o **Stub RMI**, recebe os cliques da interface React em `localhost:8081` (ou `8082`) e traduz cada clique para uma chamada RMI real no `stub`.
+- Portanto, o `ClientBridgeMain` **é o nosso Cliente RMI Java nativo**. Ele faz o `Naming.lookup`, segura o **Stub RMI**, recebe as requisições da interface React no host acessado pelo navegador, nas portas `8081` ou `8082`, e traduz cada uma para uma chamada RMI real no `stub`. O frontend usa o mesmo hostname ou IP aberto no navegador.
 
 ---
 
@@ -137,7 +137,7 @@ O tabuleiro é uma matriz `int[9][9]` onde cada número representa o conteúdo d
 
 ### 4.3. Movimentação e Colisão (`mover`)
 1. Chama `validateTurn(playerId)`: verifica se a partida está `IN_PROGRESS` e se `playerId.equals(currentTurnPlayerId)`. Caso contrário, lança `GameNotStartedException` ou `InvalidTurnException`.
-2. Verifica se `player.getMovementLeft() > 0` (se for `0`, lança `NoMovementLeftException`).
+2. Cada turno concede 4 movimentos (`movementLeft = 4`). Verifica se `player.getMovementLeft() > 0` (se for `0`, lança `NoMovementLeftException`).
 3. Calcula a coordenada alvo `(newX, newY)` somando `direcao.getDeltaX()` e `direcao.getDeltaY()`.
 4. **4 Checagens de Colisão (`CollisionException`):**
    - Saiu fora de `0..8`? $\rightarrow$ `CollisionException`
@@ -147,8 +147,8 @@ O tabuleiro é uma matriz `int[9][9]` onde cada número representa o conteúdo d
 
 ### 4.4. Plantar Bomba (`plantarBomba`)
 1. Valida turno (`validateTurn`).
-2. Verifica se o jogador tem saldo de bombas no turno (`player.getAp() >= 1`) e se já não há bomba naquela coordenada (`board[py][px] != CELL_BOMB`). Caso contrário, lança `InsufficientApException`.
-3. Desconta `1 AP`, marca `board[py][px] = 3` (`CELL_BOMB`) e salva a coordenada `"x,y"` no conjunto `activeBombCoords`.
+2. Verifica se o jogador ainda não plantou bomba no turno (`bombsPlantedThisTurn < 1`), se tem 1 AP e se já não há bomba naquela coordenada (`board[py][px] != CELL_BOMB`). Caso contrário, lança `InsufficientApException`.
+3. Desconta `1 AP`, incrementa `bombsPlantedThisTurn`, marca `board[py][px] = 3` (`CELL_BOMB`) e salva a coordenada "x,y" no conjunto `activeBombCoords`. Cada jogador pode plantar somente 1 bomba por turno.
 4. **Ponto-chave:** Plantar a bomba **não encerra o turno**! O jogador continua com seu `movementLeft` restante para fazer a **fuga em "L"** (sair da linha e da coluna da bomba antes de detonar).
 
 ### 4.5. Confirmar Turno e Algoritmo da Explosão em Cruz (`confirmarTurno`)
@@ -164,7 +164,7 @@ flowchart TD
     E --> F{"Fase 3: Verificação de Sobrevivência"}
     F -- "!p1.vivo && !p2.vivo" --> G["status = FINISHED<br/>winnerId = 'EMPATE'"]
     F -- "Apenas 1 vivo" --> H["status = FINISHED<br/>winnerId = sobrevivente"]
-    F -- "Ambos vivos" --> I["Alterna currentTurnPlayerId para o oponente<br/>Calcula movimentos e bombas progressivas do próximo turno"]
+    F -- "Ambos vivos" --> I["Alterna currentTurnPlayerId para o oponente<br/>Restaura 4 movimentos e 1 AP para o próximo turno"]
 ```
 
 - **Como o loop da explosão em cruz funciona (linhas 247–274 de `BombermanServiceImpl.java`):**
@@ -174,10 +174,7 @@ flowchart TD
   - Se encontrar bloco destrutível (`CELL_DESTRUCTIBLE == 2`): transforma o bloco em fogo (`CELL_FIRE == 4`) e dá `break` (destrói o bloco, mas o fogo não atravessa para a casa de trás!).
   - Se for vazio: preenche com `CELL_FIRE == 4` e continua até `r = 2`.
 
-- **Progressão Dinâmica por Turno (`PlayerDTO.java`):**
-  Para tornar as partidas 1v1 mais rápidas e intensas conforme os turnos avançam, o método `confirmarTurno` calcula a quantidade de passos e bombas do próximo turno em `PlayerDTO`:
-  - `calculateMaxMovementForTurn(turno)`: Começa com **5 passos** no Turno 1 e aumenta progressivamente (`5 -> 8 -> 12 -> 17...`).
-  - `calculateBombAllowanceForTurn(turno)`: Começa com **1 bomba** no Turno 1, sobe para **2 bombas** nos turnos 2 a 4, **3 bombas** nos turnos 5 a 7, e assim por diante.
+- **Recursos fixos por turno (`PlayerDTO.java`):** Cada turno começa com 4 movimentos (`movementLeft` e `maxMovement`) e 1 AP, que permite plantar uma bomba. Ao alternar a vez, o servidor restaura esses valores para o jogador seguinte. AP não utilizado não acumula.
 
 ### 4.6. Desconexão / W.O. (`desconectarJogador`) e Revanche (`reiniciarPartida`)
 - **`desconectarJogador`:** Se a partida estiver `IN_PROGRESS` e um jogador sair ou fechar a aba, o servidor declara imediatamente `status = FINISHED` e define o jogador que permaneceu conectado como vencedor por **W.O.**
@@ -201,6 +198,6 @@ flowchart TD
      1. Bloqueio de ações antes do 2º jogador entrar (`GameNotStartedException`).
      2. Início automático na entrada do 2º jogador (`IN_PROGRESS`) e bloqueio do 3º jogador (`GameFullException`).
      3. Ciclo completo de turno: mover, plantar bomba, afastar em "L", explodir bloco e alternar turno (`P1 -> P2`).
-     4. Progressão dinâmica de passos (`5 -> 8 -> 12 -> 17 -> 23...`) e bombas por turno (`1 -> 2 -> 2 -> 2 -> 3...`).
+     4. Recursos fixos por turno: 4 movimentos, 1 AP, limite de 1 bomba e restauração dos recursos em turnos sucessivos.
      5. Vitória por W.O. na desconexão (`desconectarJogador`).
      6. Morte simultânea gerando `EMPATE`.
