@@ -18,7 +18,7 @@ public class BombermanServiceImpl extends UnicastRemoteObject implements IBomber
 
     private final int[][] board = new int[BOARD_SIZE][BOARD_SIZE];
     private final List<PlayerDTO> players = new ArrayList<>();
-    private final Set<String> activeBombCoords = new HashSet<>(); // "x,y"
+    private final Set<String> activeBombCoords = new HashSet<>();
     private boolean fireOnBoard = false;
 
     private String currentTurnPlayerId;
@@ -45,6 +45,7 @@ public class BombermanServiceImpl extends UnicastRemoteObject implements IBomber
     }
 
     public void initializeBoard(Random random) {
+        Random boardRandom = random == null ? new Random() : random;
         for (int y = 0; y < BOARD_SIZE; y++) {
             for (int x = 0; x < BOARD_SIZE; x++) {
                 board[y][x] = GameStateDTO.CELL_EMPTY;
@@ -78,7 +79,7 @@ public class BombermanServiceImpl extends UnicastRemoteObject implements IBomber
                 if (board[y][x] == GameStateDTO.CELL_WALL) continue;
                 if (protectedCells.contains(x + "," + y)) continue;
 
-                if (random.nextDouble() < 0.70) {
+                if (boardRandom.nextDouble() < 0.70) {
                     board[y][x] = GameStateDTO.CELL_DESTRUCTIBLE;
                 }
             }
@@ -197,6 +198,10 @@ public class BombermanServiceImpl extends UnicastRemoteObject implements IBomber
                 throw new InvalidTurnException("Jogador não encontrado ou eliminado.");
             }
 
+            if (player.getBombsPlantedThisTurn() >= PlayerDTO.BASE_BOMBS_PER_TURN) {
+                throw new InsufficientApException("Limite de 1 bomba por turno atingido.");
+            }
+
             if (player.getAp() < 1) {
                 throw new InsufficientApException("Pontos de Ação (AP) insuficientes para plantar bomba.");
             }
@@ -244,8 +249,8 @@ public class BombermanServiceImpl extends UnicastRemoteObject implements IBomber
                 fireOnBoard = true;
                 int[][] directions = {{0, -1}, {0, 1}, {-1, 0}, {1, 0}};
 
-                for (String coord : bombsToExplode) {
-                    String[] parts = coord.split(",");
+                for (String bomb : bombsToExplode) {
+                    String[] parts = bomb.split(",");
                     int bx = Integer.parseInt(parts[0]);
                     int by = Integer.parseInt(parts[1]);
 
@@ -284,7 +289,7 @@ public class BombermanServiceImpl extends UnicastRemoteObject implements IBomber
                 }
             }
 
-            // --- 2. RESET CONTADOR DE BOMBAS DO TURNO ---
+            // Consumed bombs are reset for the next time this player receives a turn.
             current.setBombsPlantedThisTurn(0);
 
             // --- 3. CONDIÇÃO DE VITÓRIA / TOGGLE DIRETO ---
@@ -306,19 +311,13 @@ public class BombermanServiceImpl extends UnicastRemoteObject implements IBomber
             } else {
                 // Ambos vivos: Toggle direto entre P1 e P2
                 currentTurnPlayerId = opponent.getId();
-                int nextPlayerTurn = (turnNumber / 2) + 1;
-                int nextMaxMovement = PlayerDTO.calculateMaxMovementForTurn(nextPlayerTurn);
-                int nextBombAllowance = PlayerDTO.calculateBombAllowanceForTurn(nextPlayerTurn);
-                opponent.setTurnsPlayed(nextPlayerTurn);
-                opponent.setMaxMovement(nextMaxMovement);
-                opponent.setMovementLeft(nextMaxMovement);
-                opponent.setAp(nextBombAllowance);
+                opponent.setMaxMovement(PlayerDTO.INITIAL_MOVEMENT);
+                opponent.setMovementLeft(PlayerDTO.INITIAL_MOVEMENT);
+                opponent.setAp(PlayerDTO.INITIAL_AP);
                 opponent.setBombsPlantedThisTurn(0);
                 turnNumber++;
                 report.append("Novo turno: vez de ").append(opponent.getNome())
-                        .append(" (").append(nextMaxMovement).append(" passos, ")
-                        .append(nextBombAllowance).append(nextBombAllowance > 1 ? " bombas" : " bomba")
-                        .append(").");
+                        .append(" (").append(PlayerDTO.INITIAL_MOVEMENT).append(" passos, 1 bomba).");
             }
 
             lastActionMessage = report.toString().trim();
@@ -387,7 +386,6 @@ public class BombermanServiceImpl extends UnicastRemoteObject implements IBomber
                     p.setY(SPAWN_COORDS[i][1]);
                     p.setVivo(true);
                     p.setAp(PlayerDTO.INITIAL_AP);
-                    p.setTurnsPlayed(1);
                     p.setMaxMovement(PlayerDTO.INITIAL_MOVEMENT);
                     p.setMovementLeft(PlayerDTO.INITIAL_MOVEMENT);
                     p.setBombsPlantedThisTurn(0);
@@ -458,7 +456,9 @@ public class BombermanServiceImpl extends UnicastRemoteObject implements IBomber
         for (PlayerDTO p : players) {
             copiedPlayers.add(clonePlayer(p));
         }
-        return new GameStateDTO(board, copiedPlayers, currentTurnPlayerId, status, winnerId, winnerName, turnNumber, lastActionMessage);
+
+        return new GameStateDTO(board, copiedPlayers, currentTurnPlayerId, status, winnerId, winnerName,
+                turnNumber, lastActionMessage);
     }
 
     private PlayerDTO clonePlayer(PlayerDTO src) {
@@ -471,7 +471,6 @@ public class BombermanServiceImpl extends UnicastRemoteObject implements IBomber
         copy.setAp(src.getAp());
         copy.setMovementLeft(src.getMovementLeft());
         copy.setMaxMovement(src.getMaxMovement());
-        copy.setTurnsPlayed(src.getTurnsPlayed());
         copy.setBombsPlantedThisTurn(src.getBombsPlantedThisTurn());
         return copy;
     }

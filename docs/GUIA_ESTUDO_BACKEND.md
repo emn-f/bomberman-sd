@@ -33,7 +33,7 @@ graph LR
 
 | Pacote | Papel no Sistema Distribuído | Principais Arquivos |
 | :--- | :--- | :--- |
-| **`shared`** | **Contrato Compartilhado:** Tudo que tanto o Cliente quanto o Servidor precisam conhecer (Interface Remota, DTOs serializáveis, Enums e Exceções). | `IBombermanService.java`, `GameStateDTO.java`, `PlayerDTO.java`, `DirectionEnum.java`, `GameStatusEnum.java` + Exceções |
+| **`shared`** | **Contrato Compartilhado:** Tudo que tanto o Cliente quanto o Servidor precisam conhecer (Interface Remota, DTOs serializáveis, Enums e Exceções). | `IBombermanService.java`, `GameStateDTO.java`, `PlayerDTO.java` + Exceções |
 | **`server`** | **Servidor Autoritativo RMI:** Cria o Registry na porta `1099`, instancia o objeto remoto e executa toda a regra de negócio da matriz `9x9` com controle de concorrência. | `ServerMain.java`, `BombermanServiceImpl.java` |
 | **`clientbridge`** | **Cliente RMI + Adaptador HTTP:** Conecta no servidor RMI via protocolo **JRMP** (`Naming.lookup`) obtendo o **Stub**, e abre uma porta HTTP local (`8081`/`8082`) para o navegador (React) conversar via JSON. | `ClientBridgeMain.java` |
 
@@ -139,7 +139,7 @@ O tabuleiro é uma matriz `int[9][9]` onde cada número representa o conteúdo d
 1. Chama `validateTurn(playerId)`: verifica se a partida está `IN_PROGRESS` e se `playerId.equals(currentTurnPlayerId)`. Caso contrário, lança `GameNotStartedException` ou `InvalidTurnException`.
 2. Verifica se `player.getMovementLeft() > 0` (se for `0`, lança `NoMovementLeftException`).
 3. Calcula a coordenada alvo `(newX, newY)` somando `direcao.getDeltaX()` e `direcao.getDeltaY()`.
-4. **4 Checagens de Colisão (`CollisionException`):**
+4. **Checagens de Colisão (`CollisionException`):**
    - Saiu fora de `0..8`? $\rightarrow$ `CollisionException`
    - Bateu em parede `1`, bloco `2` ou bomba `3`? $\rightarrow$ `CollisionException`
    - Bateu na mesma casa onde está o oponente vivo? $\rightarrow$ `CollisionException`
@@ -147,8 +147,8 @@ O tabuleiro é uma matriz `int[9][9]` onde cada número representa o conteúdo d
 
 ### 4.4. Plantar Bomba (`plantarBomba`)
 1. Valida turno (`validateTurn`).
-2. Verifica se o jogador tem saldo de bombas no turno (`player.getAp() >= 1`) e se já não há bomba naquela coordenada (`board[py][px] != CELL_BOMB`). Caso contrário, lança `InsufficientApException`.
-3. Desconta `1 AP`, marca `board[py][px] = 3` (`CELL_BOMB`) e salva a coordenada `"x,y"` no conjunto `activeBombCoords`.
+2. Verifica se o jogador ainda não plantou uma bomba neste turno, se tem AP e se já não há bomba naquela coordenada. Caso contrário, lança `InsufficientApException`.
+3. Desconta `1 AP`, marca `board[py][px] = 3` (`CELL_BOMB`) e guarda a coordenada em `activeBombCoords`.
 4. **Ponto-chave:** Plantar a bomba **não encerra o turno**! O jogador continua com seu `movementLeft` restante para fazer a **fuga em "L"** (sair da linha e da coluna da bomba antes de detonar).
 
 ### 4.5. Confirmar Turno e Algoritmo da Explosão em Cruz (`confirmarTurno`)
@@ -159,25 +159,23 @@ flowchart TD
     A["confirmarTurno(playerId)"] --> B["Fase 1: Detonação em Cruz (Raio 2)"]
     B --> C{"Algum jogador está em<br/>célula CELL_FIRE (4)?"}
     C -- Sim --> D["Marca jogador.setVivo(false)"]
-    C -- Não --> E["Fase 2: Zera bombsPlantedThisTurn"]
+    C -- Não --> E["Fase 2: Reseta contador de bombas do turno"]
     D --> E
     E --> F{"Fase 3: Verificação de Sobrevivência"}
     F -- "!p1.vivo && !p2.vivo" --> G["status = FINISHED<br/>winnerId = 'EMPATE'"]
     F -- "Apenas 1 vivo" --> H["status = FINISHED<br/>winnerId = sobrevivente"]
-    F -- "Ambos vivos" --> I["Alterna currentTurnPlayerId para o oponente<br/>Calcula movimentos e bombas progressivas do próximo turno"]
+    F -- "Ambos vivos" --> I["Alterna currentTurnPlayerId para o oponente<br/>Define 4 movimentos e 1 AP"]
 ```
 
-- **Como o loop da explosão em cruz funciona (linhas 247–274 de `BombermanServiceImpl.java`):**
-  Para cada bomba em `activeBombCoords`, o código percorre as 4 direções ortogonais (`UP`, `DOWN`, `LEFT`, `RIGHT`) com alcance `r = 1` até `r = 2`:
+- **Como o loop da explosão em cruz funciona (`BombermanServiceImpl.java`):**
+  Para cada bomba em `activeBombCoords`, o código percorre as 4 direções ortogonais (`UP`, `DOWN`, `LEFT`, `RIGHT`) por até 2 casas:
   - Se sair do mapa (`< 0` ou `>= 9`): `break` (para naquela direção).
   - Se encontrar parede indestrutível (`CELL_WALL == 1`): `break` (a parede bloqueia o fogo e fica intacta).
   - Se encontrar bloco destrutível (`CELL_DESTRUCTIBLE == 2`): transforma o bloco em fogo (`CELL_FIRE == 4`) e dá `break` (destrói o bloco, mas o fogo não atravessa para a casa de trás!).
   - Se for vazio: preenche com `CELL_FIRE == 4` e continua até `r = 2`.
 
-- **Progressão Dinâmica por Turno (`PlayerDTO.java`):**
-  Para tornar as partidas 1v1 mais rápidas e intensas conforme os turnos avançam, o método `confirmarTurno` calcula a quantidade de passos e bombas do próximo turno em `PlayerDTO`:
-  - `calculateMaxMovementForTurn(turno)`: Começa com **5 passos** no Turno 1 e aumenta progressivamente (`5 -> 8 -> 12 -> 17...`).
-  - `calculateBombAllowanceForTurn(turno)`: Começa com **1 bomba** no Turno 1, sobe para **2 bombas** nos turnos 2 a 4, **3 bombas** nos turnos 5 a 7, e assim por diante.
+- **Regras Fixas por Turno (`PlayerDTO.java` e `BombermanServiceImpl.java`):**
+  Cada jogador começa seu turno com **4 movimentos** e **1 AP**, suficiente para plantar uma bomba. O AP é consumido ao plantar, não acumula entre turnos e é reposto para `1` no próximo turno do jogador. O servidor também valida explicitamente o limite de **uma bomba por turno**.
 
 ### 4.6. Desconexão / W.O. (`desconectarJogador`) e Revanche (`reiniciarPartida`)
 - **`desconectarJogador`:** Se a partida estiver `IN_PROGRESS` e um jogador sair ou fechar a aba, o servidor declara imediatamente `status = FINISHED` e define o jogador que permaneceu conectado como vencedor por **W.O.**

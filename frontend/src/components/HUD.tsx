@@ -78,10 +78,9 @@ export const HUD: React.FC<HUDProps> = ({
 
   const apCount = myPlayerInState?.ap ?? 0;
   const movementLeft = myPlayerInState?.movementLeft ?? 0;
-  const maxMovement = myPlayerInState?.maxMovement ?? 5;
-  const myTurnsPlayed = myPlayerInState?.turnsPlayed ?? 1;
+  const maxMovement = myPlayerInState?.maxMovement ?? 4;
 
-  // Format padded numbers like 03 AP, 04 / 12
+  // Format padded numbers like 01 AP, 04 / 04
   const pad2 = (n: number) => String(n).padStart(2, '0');
 
   return (
@@ -175,7 +174,7 @@ export const HUD: React.FC<HUDProps> = ({
             const isThisLocal = localPlayer?.id === p.id;
             const isThisTurn = gameState.currentTurnPlayerId === p.id && gameState.status === 'IN_PROGRESS';
             const isP1 = p.id === 'P1';
-            const pMaxMove = p.maxMovement ?? 5;
+            const pMaxMove = p.maxMovement ?? 4;
             const stepPct = Math.min(100, Math.max(0, Math.round((p.movementLeft / pMaxMove) * 100)));
 
             return (
@@ -276,6 +275,7 @@ export const HUD: React.FC<HUDProps> = ({
                     </span>
                   </div>
                 </div>
+
               </div>
             );
           })}
@@ -292,7 +292,7 @@ export const HUD: React.FC<HUDProps> = ({
           )}
         </div>
 
-        {/* SECTION B: Local Player Telemetry & Progressive Turn Scaling */}
+        {/* SECTION B: Local Player Telemetry & Fixed Turn Rules */}
         {myPlayerInState && (
           <div className="bg-surface-container-low border border-outline-variant p-3">
             <div className="grid grid-cols-2 gap-2.5 mb-2.5">
@@ -317,14 +317,11 @@ export const HUD: React.FC<HUDProps> = ({
               </div>
             </div>
 
-            {/* Active Progression Rule Badge */}
+            {/* Fixed Turn Rules */}
             <div className="flex items-center justify-between gap-2 px-2.5 py-1.5 bg-surface-container border border-secondary/60 text-secondary font-telemetry-sm text-[10px]">
               <span className="flex items-center gap-1.5 font-bold">
                 <Zap className="w-3.5 h-3.5 shrink-0" />
-                ESCALONAMENTO ATIVO (SEU TURNO #{myTurnsPlayed})
-              </span>
-              <span className="text-on-surface-variant font-mono">
-                [MAX: {maxMovement} PASSOS]
+                4 PASSOS · 1 BOMBA POR TURNO
               </span>
             </div>
           </div>

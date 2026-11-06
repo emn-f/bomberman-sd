@@ -58,13 +58,12 @@ npm run dev
 
 Acesse `http://localhost:3000`:
 - **Aba 1:** Conecte no bridge `http://localhost:8081` (Jogador 1, P1). Fica em espera (`WAITING_FOR_PLAYERS`).
-- **Aba 2:** Altere o campo Bridge URL no topo para `http://localhost:8082` e conecte (Jogador 2, P2). O jogo inicia automaticamente (`IN_PROGRESS`).
+- **Aba 2:** Selecione **Jogador 2 (:8082)** e conecte (P2). O jogo inicia automaticamente (`IN_PROGRESS`). Ao acessar pela rede local, o frontend usa automaticamente o mesmo IP do endereço aberto no navegador.
 
 ---
 
 ## 🎮 Controles no Jogo
 
-- **Mover:** Teclas `W`, `A`, `S`, `D` ou Setas do teclado (ou botões no D-Pad da HUD). Consome 1 movimento de 5.
-- **Plantar Bomba:** Tecla `Espaço` ou botão **"Plantar Bomba (-1 AP)"**.
-- **Confirmar Turno:** Tecla `Enter` ou botão **"Confirmar Turno / Detonar"** (detona todas as bombas ativas em cruz de raio 2 e passa a vez).
-- **Economia de Bombas:** Passar o turno sem plantar bombas garante **+1 AP de bônus** extra para a próxima rodada!
+- **Mover:** Teclas `W`, `A`, `S`, `D` ou Setas do teclado (ou botões no D-Pad da HUD). Cada jogador tem 4 movimentos por turno.
+- **Plantar Bomba:** Tecla `Espaço` ou botão **"Plantar Bomba (-1 AP)"**. Cada jogador pode plantar 1 bomba por turno; AP não acumula.
+- **Confirmar Turno:** Tecla `Enter` ou botão **"Confirmar Turno / Detonar"** (detona as bombas ativas em cruz de raio 2 e passa a vez).

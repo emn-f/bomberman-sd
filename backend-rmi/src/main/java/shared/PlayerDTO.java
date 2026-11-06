@@ -6,8 +6,8 @@ public class PlayerDTO implements Serializable {
     private static final long serialVersionUID = 1L;
 
     public static final int INITIAL_AP = 1;
-    public static final int MAX_AP = 5;
-    public static final int INITIAL_MOVEMENT = 5;
+    public static final int BASE_BOMBS_PER_TURN = 1;
+    public static final int INITIAL_MOVEMENT = 4;
 
     private String id;
     private String nome;
@@ -17,7 +17,6 @@ public class PlayerDTO implements Serializable {
     private int ap;
     private int movementLeft;
     private int maxMovement;
-    private int turnsPlayed;
     private int bombsPlantedThisTurn;
 
     public PlayerDTO() {
@@ -32,21 +31,7 @@ public class PlayerDTO implements Serializable {
         this.ap = INITIAL_AP;
         this.movementLeft = INITIAL_MOVEMENT;
         this.maxMovement = INITIAL_MOVEMENT;
-        this.turnsPlayed = 1;
         this.bombsPlantedThisTurn = 0;
-    }
-
-    public static int calculateMaxMovementForTurn(int playerTurnNumber) {
-        if (playerTurnNumber <= 1) return INITIAL_MOVEMENT;
-        int n = playerTurnNumber;
-        // Turn 1: 5 | Turn 2: 8 (+3) | Turn 3: 12 (+4) | Turn 4: 17 (+5) ...
-        return INITIAL_MOVEMENT + ((n - 1) * (n + 4)) / 2;
-    }
-
-    public static int calculateBombAllowanceForTurn(int playerTurnNumber) {
-        if (playerTurnNumber <= 1) return 1;
-        // Turno 1: 1 | Turnos 2,3,4: 2 | Turnos 5,6,7: 3 | Turnos 8,9,10: 4 ...
-        return 2 + (playerTurnNumber - 2) / 3;
     }
 
     public String getId() {
@@ -111,14 +96,6 @@ public class PlayerDTO implements Serializable {
 
     public void setMaxMovement(int maxMovement) {
         this.maxMovement = maxMovement;
-    }
-
-    public int getTurnsPlayed() {
-        return turnsPlayed;
-    }
-
-    public void setTurnsPlayed(int turnsPlayed) {
-        this.turnsPlayed = turnsPlayed;
     }
 
     public int getBombsPlantedThisTurn() {

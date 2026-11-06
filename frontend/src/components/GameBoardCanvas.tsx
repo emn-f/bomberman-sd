@@ -8,7 +8,6 @@ interface GameBoardCanvasProps {
 
 const COLS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I'];
 const ROWS = ['1', '2', '3', '4', '5', '6', '7', '8', '9'];
-
 export const GameBoardCanvas: React.FC<GameBoardCanvasProps> = ({ gameState, localPlayer }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const animFrameRef = useRef<number>(0);
@@ -39,7 +38,6 @@ export const GameBoardCanvas: React.FC<GameBoardCanvasProps> = ({ gameState, loc
       }
 
       const board = gameState.board;
-
       // 1. Draw Tactical Obsidian Floor & Grid
       for (let y = 0; y < boardSize; y++) {
         for (let x = 0; x < boardSize; x++) {
@@ -65,7 +63,7 @@ export const GameBoardCanvas: React.FC<GameBoardCanvasProps> = ({ gameState, loc
         }
       }
 
-      // 2. Calculate Danger Zone for active bombs (cross range = 2)
+      // 2. Calculate each active bomb's Danger Zone (fixed radius 2)
       const dangerCells = new Set<string>();
       const bombPositions: { x: number; y: number }[] = [];
 
@@ -432,7 +430,7 @@ export const GameBoardCanvas: React.FC<GameBoardCanvasProps> = ({ gameState, loc
         {hasActiveBomb ? (
           <span className="text-tertiary-fixed-dim font-bold flex items-center gap-1 animate-pulse">
             <span className="material-symbols-outlined text-[13px]">warning</span>
-            ZONA DE IMPACTO ATIVA (RAIO 2)
+            ZONA DE IMPACTO ATIVA
           </span>
         ) : (
           <span className="text-outline font-mono">

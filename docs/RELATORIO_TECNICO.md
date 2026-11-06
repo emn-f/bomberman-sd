@@ -9,11 +9,11 @@
 ### 1.1. Descrição do Jogo Escolhido
 O presente projeto consiste no desenvolvimento de uma versão distribuída, baseada em turnos, do clássico jogo **Bomberman**, adaptada especificamente para partidas competitivas no formato **1v1 estrito (exatamente dois jogadores)** em um tabuleiro matricial de dimensões **9x9**.
 
-Diferente do Bomberman tradicional em tempo real contínuo, a abordagem em turnos discretos opera com um sistema tático de **Action Points (AP / Estoque de Bombas) acumuláveis** e limite de passos por turno (`movementLeft = 4`):
+Diferente do Bomberman tradicional em tempo real contínuo, esta adaptação usa turnos discretos com regras fixas: **4 movimentos e 1 bomba por turno para cada jogador**, sem acumular AP entre turnos.
 - **Mapa e Spawns:** O tabuleiro `9x9` possui paredes fixas indestrutíveis (`1`) nas coordenadas onde linha e coluna são ambas ímpares, blocos destrutíveis (`2`) gerados nas demais posições e zonas seguras de nascimento: o **Jogador 1 (`P1`)** inicia no canto superior esquerdo `[0,0]` (com `[0,1]` e `[1,0]` livres) e o **Jogador 2 (`P2`)** inicia no canto inferior direito `[8,8]` (com `[8,7]` e `[7,8]` livres).
-- **Mecânica de Turno e Fuga:** No seu turno, o jogador pode se mover até 4 casas ortogonais e plantar bombas na sua posição atual consumindo `1 AP` por bomba (até o limite `MAX_AP = 5`). Plantar uma bomba **não encerra o turno imediatamente**, permitindo que o jogador utilize seus passos restantes para fugir do raio letal da explosão.
-- **Confirmação do Turno (`confirmarTurno`) e Detonação:** Ao emitir a confirmação de encerramento de turno, todas as bombas ativas no tabuleiro detonam simultaneamente em formato de cruz (alcance de 2 casas em cada direção ortogonal). Paredes indestrutíveis bloqueiam o fogo; blocos destrutíveis são destruídos e interrompem a propagação naquela direção; jogadores atingidos pelo fogo são eliminados.
-- **Economia de Recursos (Bônus de AP):** Ao início de cada turno, o jogador da vez recebe `+1 AP` de recarga base. Caso o jogador encerre seu turno sem ter plantado nenhuma bomba (`bombsPlantedThisTurn == 0`), recebe um bônus estratégico de `+1 AP` adicional, incentivando o planejamento de emboscadas e o gerenciamento criterioso de recursos até o teto `MAX_AP = 5`.
+- **Mecânica de Turno e Fuga:** No seu turno, o jogador pode se mover até 4 casas ortogonais e plantar uma bomba na sua posição atual, consumindo seu único `1 AP` do turno. Plantar a bomba **não encerra o turno imediatamente**, permitindo que o jogador use os movimentos restantes para fugir do raio da explosão.
+- **Confirmação do Turno (`confirmarTurno`) e Detonação:** Ao emitir a confirmação de encerramento de turno, as bombas ativas detonam em formato de cruz com alcance fixo de 2 casas. Paredes indestrutíveis bloqueiam o fogo; blocos destrutíveis são destruídos e interrompem a propagação naquela direção; jogadores atingidos pelo fogo são eliminados.
+- **Reposição de AP:** Quando começa um novo turno do jogador, seu AP é reposto para `1`. AP não acumula e não há bônus por passar o turno sem plantar bomba.
 
 ### 1.2. Motivação da Escolha do Protocolo (Java RMI)
 A escolha do **Java Remote Method Invocation (Java RMI)** — implementação orientada a objetos do paradigma RPC (Remote Procedure Call) nativa da plataforma Java — fundamenta-se nos seguintes princípios técnicos e arquiteturais:
@@ -126,7 +126,7 @@ sequenceDiagram
         B1->>Stub1: confirmarTurno("P1")
         Stub1->>Skel: [JRMP/TCP] Marshaling("P1")
         Skel->>Impl: confirmarTurno("P1")
-        Note over Impl: 1. Detonação das bombas em cruz (raio 2).<br/>2. Destruição de blocos e cálculo de dano.<br/>3. Toggle direto de turno: P1 -> P2.<br/>4. P2.movementLeft=4, P2.AP++.<br/>ReentrantLock liberado.
+        Note over Impl: 1. Detonação das bombas em cruz (raio 2).<br/>2. Destruição de blocos e cálculo de dano.<br/>3. Toggle direto de turno: P1 -> P2.<br/>4. P2 recebe 4 movimentos e 1 AP.<br/>ReentrantLock liberado.
         Impl-->>Skel: Retorna GameStateDTO
         Skel-->>Stub1: [JRMP/TCP] Marshaling(GameStateDTO)
         Stub1-->>B1: GameStateDTO desserializado
@@ -158,9 +158,9 @@ A interface `shared.IBombermanService` estende `java.rmi.Remote` e define todos 
 | :--- | :--- | :--- | :--- | :--- |
 | `conectarJogador` | `String nome` | `PlayerDTO` | `RemoteException`, `GameFullException` | Registra até 2 jogadores (`P1` em `[0,0]`, `P2` em `[8,8]`). O 1º jogador coloca o jogo em `WAITING_FOR_PLAYERS`. A chegada do 2º jogador transiciona o estado para `IN_PROGRESS` e define `P1` na vez. Qualquer 3ª chamada lança `GameFullException`. |
 | `mover` | `String playerId`, `DirectionEnum direcao` | `GameStateDTO` | `RemoteException`, `GameNotStartedException`, `InvalidTurnException`, `NoMovementLeftException`, `CollisionException` | Valida se a partida está `IN_PROGRESS` e se é o turno do jogador. Consome `1` de `movementLeft`. Rejeita colisões contra paredes fixas (`1`), blocos destrutíveis (`2`), bombas ativas (`3`) e limites do tabuleiro 9x9. |
-| `plantarBomba` | `String playerId` | `GameStateDTO` | `RemoteException`, `GameNotStartedException`, `InvalidTurnException`, `InsufficientApException` | Ação irreversível. Consome `1 AP` (`ap--`), incrementa `bombsPlantedThisTurn++` e posiciona a bomba (`3`) na coordenada do jogador. Não encerra o turno, permitindo fuga. |
-| `confirmarTurno` | `String playerId` | `GameStateDTO` | `RemoteException`, `GameNotStartedException`, `InvalidTurnException` | **Fase 1:** Detona todas as bombas ativas em cruz (raio 2), destruindo blocos e eliminando jogadores atingidos. <br>**Fase 2:** Concede `+1 AP` de bônus caso `bombsPlantedThisTurn == 0`. <br>**Fase 3:** Verifica condições de vitória ou alterna diretamente o turno para o oponente (`movementLeft=4`, recarga base `+1 AP`). |
-| `obterEstadoJogo` | *Nenhum* | `GameStateDTO` | `RemoteException` | Retorna um instantâneo (*snapshot*) imutável do tabuleiro 9x9, posições e atributos dos jogadores, jogador da vez e mensagens de eventos. Utilizado no polling do cliente. |
+| `plantarBomba` | `String playerId` | `GameStateDTO` | `RemoteException`, `GameNotStartedException`, `InvalidTurnException`, `InsufficientApException` | Consome `1 AP` e posiciona uma bomba (`3`) na coordenada do jogador. O limite é uma bomba por turno. Não encerra o turno, permitindo fuga. |
+| `confirmarTurno` | `String playerId` | `GameStateDTO` | `RemoteException`, `GameNotStartedException`, `InvalidTurnException` | **Fase 1:** Detona as bombas ativas em cruz com raio fixo 2, destruindo blocos e eliminando jogadores atingidos. <br>**Fase 2:** Verifica condições de vitória ou alterna para o oponente, que começa com `4` movimentos e `1 AP`; AP não acumula. |
+| `obterEstadoJogo` | *Nenhum* | `GameStateDTO` | `RemoteException` | Retorna um instantâneo (*snapshot*) do tabuleiro 9x9, atributos dos jogadores, jogador da vez e mensagens de eventos. Utilizado no polling do cliente. |
 | `desconectarJogador` | `String playerId` | `void` | `RemoteException` | Caso ocorra durante `IN_PROGRESS`, declara vitória por W.O. para o jogador remanescente (`status = FINISHED`, `winnerId = opponent`). Se ocorrer em espera, remove o jogador. |
 
 ---
@@ -268,7 +268,7 @@ npm run dev
 
 Abra o navegador em `http://localhost:3000`:
 - **Aba 1 (Jogador 1):** Mantenha a URL do Bridge como `http://localhost:8081`, digite seu nome e clique em "Conectar e Jogar". O jogo exibirá o status `WAITING_FOR_PLAYERS`.
-- **Aba 2 (Jogador 2):** Altere a URL do Bridge no topo para `http://localhost:8082`, digite o nome do Jogador 2 e conecte-se. O jogo iniciará imediatamente (`IN_PROGRESS`), liberando os controles para `P1`.
+- **Aba 2 (Jogador 2):** Selecione o bridge `:8082`, digite o nome do Jogador 2 e conecte-se. O jogo iniciará imediatamente (`IN_PROGRESS`), liberando os controles para `P1`. Ao acessar pela rede local, use no navegador o IP da máquina que hospeda o frontend; o bridge usa automaticamente o mesmo host.
 
 ---
 

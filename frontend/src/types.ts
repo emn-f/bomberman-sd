@@ -11,12 +11,11 @@ export interface PlayerDTO {
   ap: number;
   movementLeft: number;
   maxMovement?: number;
-  turnsPlayed?: number;
   bombsPlantedThisTurn: number;
 }
 
 export interface GameStateDTO {
-  board: number[][]; // 9x9 matrix: 0=empty, 1=wall, 2=destructible, 3=bomb, 4=fire
+  board: number[][]; // 9x9: 0=empty, 1=wall, 2=crate, 3=bomb, 4=fire
   players: PlayerDTO[];
   currentTurnPlayerId: string | null;
   status: GameStatus;
