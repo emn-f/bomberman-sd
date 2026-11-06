@@ -197,10 +197,10 @@ flowchart TD
    - *Resposta:* O `synchronized` nativo do Java não tem garantia de fila justa (*fairness*). Como o frontend faz *polling* a cada `300ms` em `obterEstadoJogo()`, o `ReentrantLock(true)` garante ordem FIFO estrita para as threads, evitando *starvation* das jogadas e deixando explícito o bloqueio e desbloqueio (`lock()` / ` finally { unlock() }`).
 
 4. **"Como os testes automatizados (`BombermanGameTest.java`) validam o backend?"**
-   - *Resposta:* Temos 6 testes JUnit 5 que instanciam `BombermanServiceImpl` com uma semente determinística (`new Random(42)`) e testam:
-     1. Bloqueio de ações antes do 2º jogador entrar (`GameNotStartedException`) e bloqueio do 3º jogador (`GameFullException`).
-     2. Bloqueio de ação fora do turno (`InvalidTurnException`).
-     3. Colisão contra paredes fixas e limites do mapa `9x9` (`CollisionException`).
-     4. Plantio de bomba consumindo AP e fuga em "L" sobrevivendo à explosão.
-     5. Morte simultânea gerando `EMPATE`.
-     6. Vitória por W.O. na desconexão (`desconectarJogador`).
+   - *Resposta:* Temos 6 testes JUnit 5 que instanciam `BombermanServiceImpl` com uma semente determinística (`new Random(12345)`) e testam:
+     1. Bloqueio de ações antes do 2º jogador entrar (`GameNotStartedException`).
+     2. Início automático na entrada do 2º jogador (`IN_PROGRESS`) e bloqueio do 3º jogador (`GameFullException`).
+     3. Ciclo completo de turno: mover, plantar bomba, afastar em "L", explodir bloco e alternar turno (`P1 -> P2`).
+     4. Progressão dinâmica de passos (`5 -> 8 -> 12 -> 17 -> 23...`) e bombas por turno (`1 -> 2 -> 2 -> 2 -> 3...`).
+     5. Vitória por W.O. na desconexão (`desconectarJogador`).
+     6. Morte simultânea gerando `EMPATE`.

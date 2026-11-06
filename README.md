@@ -50,8 +50,6 @@ Para testar o modo 1v1 em duas abas no mesmo computador, inicie duas instâncias
 
 ### 3. Iniciar o Frontend React
 ```bash
-./run-frontend.sh
-# Ou:
 cd frontend
 npm run dev
 ```
