@@ -16,7 +16,6 @@ public class BombermanGameTest {
 
     @BeforeEach
     void setUp() throws RemoteException {
-        // Deterministic seed for reproducible tests
         service = new BombermanServiceImpl(new Random(12345));
     }
 
@@ -31,10 +30,19 @@ public class BombermanGameTest {
         assertEquals(0, p1.getY());
         assertEquals("P1", p1.getId());
 
-        // Ações devem lançar GameNotStartedException
         assertThrows(GameNotStartedException.class, () -> service.mover(p1.getId(), DirectionEnum.RIGHT));
         assertThrows(GameNotStartedException.class, () -> service.plantarBomba(p1.getId()));
         assertThrows(GameNotStartedException.class, () -> service.confirmarTurno(p1.getId()));
+    }
+
+    @Test
+    @DisplayName("Inicialização do tabuleiro aceita Random nulo")
+    void testInitializeBoardWithNullRandom() throws Exception {
+        service.initializeBoard(null);
+
+        int[][] board = service.obterEstadoJogo().getBoard();
+        assertEquals(GameStateDTO.BOARD_SIZE, board.length);
+        assertEquals(GameStateDTO.CELL_WALL, board[1][1]);
     }
 
     @Test
@@ -50,7 +58,6 @@ public class BombermanGameTest {
         assertEquals(8, p2.getY());
         assertEquals("P2", p2.getId());
 
-        // Tentativa de conectar 3º jogador deve lançar GameFullException
         assertThrows(GameFullException.class, () -> service.conectarJogador("Intruso"));
     }
 
@@ -60,32 +67,24 @@ public class BombermanGameTest {
         PlayerDTO p1 = service.conectarJogador("P1");
         PlayerDTO p2 = service.conectarJogador("P2");
 
-        // Configura caminho livre e bloco destrutível em (0, 2)
         service.setCell(0, 0, GameStateDTO.CELL_EMPTY);
         service.setCell(1, 0, GameStateDTO.CELL_EMPTY);
         service.setCell(0, 1, GameStateDTO.CELL_EMPTY);
         service.setCell(0, 2, GameStateDTO.CELL_DESTRUCTIBLE);
 
-        // P1 move para (1, 0)
         service.mover(p1.getId(), DirectionEnum.RIGHT);
 
-        // P1 planta bomba em (1, 0)
         service.plantarBomba(p1.getId());
         assertEquals(GameStateDTO.CELL_BOMB, service.getCell(1, 0));
 
-        // P1 move de volta para (0, 0)
         service.mover(p1.getId(), DirectionEnum.LEFT);
 
-        // P1 afasta descendo para (0, 1) para fugir do raio horizontal da bomba
         service.mover(p1.getId(), DirectionEnum.DOWN);
 
-        // Confirma turno
         GameStateDTO state = service.confirmarTurno(p1.getId());
 
-        // Valida que bomba explodiu (virou CELL_FIRE) e destruiu bloco em (0, 2)
         assertEquals(GameStateDTO.CELL_FIRE, state.getBoard()[0][1]);
 
-        // Toggle direto para P2 (1º turno de P2: 4 movimentos e 1 AP)
         assertEquals(p2.getId(), state.getCurrentTurnPlayerId(), "O turno deve ter alternado diretamente para P2");
         PlayerDTO p2State = state.getPlayers().get(1);
         assertEquals(4, p2State.getMovementLeft(), "P2 deve iniciar o turno com 4 movimentos");
@@ -98,12 +97,10 @@ public class BombermanGameTest {
         PlayerDTO p1 = service.conectarJogador("P1");
         PlayerDTO p2 = service.conectarJogador("P2");
 
-        // Ambos começam com 4 passos e 1 AP.
         assertEquals(1, p1.getAp());
         assertEquals(4, p1.getMovementLeft());
         assertEquals(4, p2.getMovementLeft());
 
-        // Plantar consome o único AP e uma segunda bomba é recusada.
         service.setCell(1, 1, GameStateDTO.CELL_EMPTY);
         GameStateDTO state = service.plantarBomba(p1.getId());
         PlayerDTO p1AfterPlant = state.getPlayers().get(0);
@@ -111,7 +108,6 @@ public class BombermanGameTest {
         assertEquals(1, p1AfterPlant.getBombsPlantedThisTurn());
         assertThrows(InsufficientApException.class, () -> service.plantarBomba(p1.getId()));
 
-        // P1 sai da cruz antes da detonação.
         service.mover(p1.getId(), DirectionEnum.RIGHT);
         service.mover(p1.getId(), DirectionEnum.DOWN);
         state = service.confirmarTurno(p1.getId());
@@ -119,7 +115,6 @@ public class BombermanGameTest {
         assertEquals(4, p2Turn.getMovementLeft());
         assertEquals(1, p2Turn.getAp());
 
-        // No turno seguinte, P1 recebe novamente 4 passos e exatamente 1 AP.
         state = service.confirmarTurno(p2.getId());
         PlayerDTO p1NextTurn = state.getPlayers().get(0);
         assertEquals(4, p1NextTurn.getMovementLeft());
@@ -136,14 +131,66 @@ public class BombermanGameTest {
         GameStateDTO state = service.obterEstadoJogo();
         assertEquals(GameStatusEnum.IN_PROGRESS, state.getStatus());
 
-        // P1 desconecta durante o jogo
         service.desconectarJogador(p1.getId());
 
         GameStateDTO finishedState = service.obterEstadoJogo();
         assertEquals(GameStatusEnum.FINISHED, finishedState.getStatus());
         assertEquals(p2.getId(), finishedState.getWinnerId(), "P2 deve ser declarado vencedor por W.O.");
-        assertFalse(finishedState.getPlayers().get(0).isVivo(), "P1 deve estar com vivo=false");
+        assertEquals(1, finishedState.getPlayers().size(), "O jogador desconectado deve ser removido da partida.");
+        assertEquals(p2.getId(), finishedState.getPlayers().get(0).getId());
+        assertTrue(finishedState.getPlayers().get(0).isVivo());
         assertTrue(finishedState.getLastActionMessage().contains("Vitória por W.O."));
+    }
+
+    @Test
+    @DisplayName("1v1: Reinício é recusado enquanto a partida está em andamento")
+    void testRestartRejectedDuringMatch() throws Exception {
+        service.conectarJogador("P1");
+        service.conectarJogador("P2");
+
+        assertThrows(InvalidTurnException.class, () -> service.reiniciarPartida());
+        assertEquals(GameStatusEnum.IN_PROGRESS, service.obterEstadoJogo().getStatus());
+    }
+
+    @Test
+    @DisplayName("1v1: Revanche após finalização mantém os dois jogadores")
+    void testRestartAfterFinishedMatchWithBothPlayers() throws Exception {
+        PlayerDTO p1 = service.conectarJogador("P1");
+        service.conectarJogador("P2");
+        service.plantarBomba(p1.getId());
+        GameStateDTO finished = service.confirmarTurno(p1.getId());
+        assertEquals(GameStatusEnum.FINISHED, finished.getStatus());
+
+        GameStateDTO restarted = service.reiniciarPartida();
+
+        assertEquals(GameStatusEnum.IN_PROGRESS, restarted.getStatus());
+        assertEquals("P1", restarted.getCurrentTurnPlayerId());
+        assertEquals(2, restarted.getPlayers().size());
+        assertTrue(restarted.getPlayers().stream().allMatch(PlayerDTO::isVivo));
+        assertEquals(4, restarted.getPlayers().get(0).getMovementLeft());
+        assertEquals(1, restarted.getPlayers().get(0).getAp());
+    }
+
+    @Test
+    @DisplayName("1v1: Após W.O., revanche aguarda um novo oponente")
+    void testRestartAfterDisconnectWaitsForOpponent() throws Exception {
+        PlayerDTO p1 = service.conectarJogador("P1");
+        PlayerDTO p2 = service.conectarJogador("P2");
+        service.desconectarJogador(p2.getId());
+
+        GameStateDTO restarted = service.reiniciarPartida();
+
+        assertEquals(GameStatusEnum.WAITING_FOR_PLAYERS, restarted.getStatus());
+        assertEquals(1, restarted.getPlayers().size());
+        assertEquals(p1.getId(), restarted.getPlayers().get(0).getId());
+        assertTrue(restarted.getPlayers().get(0).isVivo());
+
+        PlayerDTO replacement = service.conectarJogador("Novo P2");
+        GameStateDTO started = service.obterEstadoJogo();
+        assertEquals("P2", replacement.getId());
+        assertEquals(GameStatusEnum.IN_PROGRESS, started.getStatus());
+        assertEquals("P1", started.getCurrentTurnPlayerId());
+        assertEquals(2, started.getPlayers().size());
     }
 
     @Test
@@ -152,30 +199,41 @@ public class BombermanGameTest {
         PlayerDTO p1 = service.conectarJogador("P1");
         PlayerDTO p2 = service.conectarJogador("P2");
 
-        // Posiciona ambos na área de fogo de uma bomba em (4,4)
-        service.setCell(4, 4, GameStateDTO.CELL_EMPTY);
-        service.setCell(4, 3, GameStateDTO.CELL_EMPTY);
-        service.setCell(4, 5, GameStateDTO.CELL_EMPTY);
-
-        // Move P1 e P2 para perto
-        GameStateDTO st = service.obterEstadoJogo();
-        PlayerDTO liveP1 = st.getPlayers().get(0);
-        PlayerDTO liveP2 = st.getPlayers().get(1);
-        liveP1.setX(4);
-        liveP1.setY(3);
-        liveP2.setX(4);
-        liveP2.setY(5);
-
-        // Planta bomba em (4,4) simulada
-        service.setCell(4, 4, GameStateDTO.CELL_BOMB);
-        // Confirma turno
-        st = service.confirmarTurno(p1.getId());
-
-        // Ambos devem ser atingidos se a bomba em (4,4) explodir
-        // Se ambos morreram:
-        if (!st.getPlayers().get(0).isVivo() && !st.getPlayers().get(1).isVivo()) {
-            assertEquals("EMPATE", st.getWinnerId());
-            assertEquals(GameStatusEnum.FINISHED, st.getStatus());
+        for (int x = 0; x <= 4; x++) {
+            service.setCell(x, 0, GameStateDTO.CELL_EMPTY);
         }
+        for (int x = 4; x <= 8; x++) {
+            service.setCell(x, 8, GameStateDTO.CELL_EMPTY);
+        }
+        for (int y = 1; y <= 7; y++) {
+            service.setCell(4, y, GameStateDTO.CELL_EMPTY);
+        }
+
+        for (int i = 0; i < 4; i++) {
+            service.mover(p1.getId(), DirectionEnum.RIGHT);
+        }
+        service.confirmarTurno(p1.getId());
+
+        for (int i = 0; i < 4; i++) {
+            service.mover(p2.getId(), DirectionEnum.LEFT);
+        }
+        service.confirmarTurno(p2.getId());
+
+        for (int i = 0; i < 3; i++) {
+            service.mover(p1.getId(), DirectionEnum.DOWN);
+        }
+        service.confirmarTurno(p1.getId());
+
+        for (int i = 0; i < 3; i++) {
+            service.mover(p2.getId(), DirectionEnum.UP);
+        }
+        service.confirmarTurno(p2.getId());
+
+        service.plantarBomba(p1.getId());
+        GameStateDTO state = service.confirmarTurno(p1.getId());
+
+        assertEquals(GameStatusEnum.FINISHED, state.getStatus());
+        assertEquals("EMPATE", state.getWinnerId());
+        assertTrue(state.getPlayers().stream().noneMatch(PlayerDTO::isVivo));
     }
 }

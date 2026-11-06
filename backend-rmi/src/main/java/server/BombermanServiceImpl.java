@@ -10,10 +10,9 @@ import java.util.concurrent.locks.ReentrantLock;
 public class BombermanServiceImpl extends UnicastRemoteObject implements IBombermanService {
     private static final long serialVersionUID = 1L;
 
-    public static final int BOARD_SIZE = GameStateDTO.BOARD_SIZE; // 9
+    public static final int BOARD_SIZE = GameStateDTO.BOARD_SIZE;
     public static final int REQUIRED_PLAYERS = 2;
 
-    // Concurrency control: Fair ReentrantLock to avoid race conditions
     private final ReentrantLock lock = new ReentrantLock(true);
 
     private final int[][] board = new int[BOARD_SIZE][BOARD_SIZE];
@@ -28,10 +27,9 @@ public class BombermanServiceImpl extends UnicastRemoteObject implements IBomber
     private int turnNumber = 0;
     private String lastActionMessage = "Aguardando 2 jogadores conectarem...";
 
-    // 1v1 Spawns: P1 top-left [0,0], P2 bottom-right [8,8]
     private static final int[][] SPAWN_COORDS = {
-            {0, 0}, // P1
-            {8, 8}  // P2
+            {0, 0},
+            {8, 8}
     };
 
     public BombermanServiceImpl() throws RemoteException {
@@ -52,7 +50,6 @@ public class BombermanServiceImpl extends UnicastRemoteObject implements IBomber
             }
         }
 
-        // Fixed pillars: row and column are both odd
         for (int y = 0; y < BOARD_SIZE; y++) {
             for (int x = 0; x < BOARD_SIZE; x++) {
                 if (y % 2 == 1 && x % 2 == 1) {
@@ -61,19 +58,15 @@ public class BombermanServiceImpl extends UnicastRemoteObject implements IBomber
             }
         }
 
-        // Protected cells around P1 [0,0] and P2 [8,8]
         Set<String> protectedCells = new HashSet<>();
-        // P1: [0,0], [0,1], [1,0]
         protectedCells.add("0,0");
         protectedCells.add("0,1");
         protectedCells.add("1,0");
 
-        // P2: [8,8], [8,7], [7,8]
         protectedCells.add("8,8");
         protectedCells.add("8,7");
         protectedCells.add("7,8");
 
-        // Populate destructible blocks
         for (int y = 0; y < BOARD_SIZE; y++) {
             for (int x = 0; x < BOARD_SIZE; x++) {
                 if (board[y][x] == GameStateDTO.CELL_WALL) continue;
@@ -90,16 +83,18 @@ public class BombermanServiceImpl extends UnicastRemoteObject implements IBomber
     public PlayerDTO conectarJogador(String nome) throws RemoteException, GameFullException {
         lock.lock();
         try {
-            // Se a partida anterior já havia terminado, limpa e prepara uma nova sala automaticamente
             if (status == GameStatusEnum.FINISHED) {
-                resetMatchInternal();
+                if (players.size() == 1) {
+                    prepareRematchWaitingForOpponent();
+                } else {
+                    resetMatchInternal();
+                }
             }
 
             if (players.size() >= REQUIRED_PLAYERS) {
                 throw new GameFullException("Partida lotada. Limite estrito de " + REQUIRED_PLAYERS + " jogadores (1v1).");
             }
 
-            // Garante o menor ID disponível ("P1" ou "P2") mesmo que alguém tenha saído antes de começar
             boolean p1Occupied = players.stream().anyMatch(p -> "P1".equals(p.getId()));
             int slotIndex = p1Occupied ? 1 : 0;
             int spawnX = SPAWN_COORDS[slotIndex][0];
@@ -119,9 +114,8 @@ public class BombermanServiceImpl extends UnicastRemoteObject implements IBomber
                 currentTurnPlayerId = null;
                 lastActionMessage = newPlayer.getNome() + " conectou-se como " + id + " (" + spawnX + "," + spawnY + "). Aguardando oponente...";
             } else if (players.size() == 2) {
-                // Auto-start 1v1 match
                 status = GameStatusEnum.IN_PROGRESS;
-                currentTurnPlayerId = players.get(0).getId(); // P1 starts
+                currentTurnPlayerId = players.get(0).getId();
                 turnNumber = 1;
                 lastActionMessage = newPlayer.getNome() + " conectou-se como " + id + " (" + spawnX + "," + spawnY + "). Partida 1v1 iniciada! Vez de " + players.get(0).getNome() + ".";
             }
@@ -151,12 +145,10 @@ public class BombermanServiceImpl extends UnicastRemoteObject implements IBomber
             int newX = player.getX() + direcao.getDeltaX();
             int newY = player.getY() + direcao.getDeltaY();
 
-            // Boundary validation
             if (newX < 0 || newX >= BOARD_SIZE || newY < 0 || newY >= BOARD_SIZE) {
                 throw new CollisionException("Movimento inválido: fora dos limites do tabuleiro 9x9.");
             }
 
-            // Cell contents validation
             int cell = board[newY][newX];
             if (cell == GameStateDTO.CELL_WALL) {
                 throw new CollisionException("Colisão com parede indestrutível.");
@@ -168,7 +160,6 @@ public class BombermanServiceImpl extends UnicastRemoteObject implements IBomber
                 throw new CollisionException("Colisão com bomba ativa.");
             }
 
-            // Opponent collision
             for (PlayerDTO other : players) {
                 if (other.isVivo() && !other.getId().equals(playerId) && other.getX() == newX && other.getY() == newY) {
                     throw new CollisionException("Célula ocupada pelo oponente " + other.getNome() + ".");
@@ -241,7 +232,6 @@ public class BombermanServiceImpl extends UnicastRemoteObject implements IBomber
             StringBuilder report = new StringBuilder();
             report.append(current.getNome()).append(" confirmou o turno. ");
 
-            // --- 1. EXPLOSÃO DAS BOMBAS ---
             List<String> bombsToExplode = new ArrayList<>(activeBombCoords);
             activeBombCoords.clear();
 
@@ -278,7 +268,6 @@ public class BombermanServiceImpl extends UnicastRemoteObject implements IBomber
                     }
                 }
 
-                // Check casualties
                 if (p1.isVivo() && board[p1.getY()][p1.getX()] == GameStateDTO.CELL_FIRE) {
                     p1.setVivo(false);
                     report.append(p1.getNome()).append(" foi eliminado pela explosão! ");
@@ -289,10 +278,8 @@ public class BombermanServiceImpl extends UnicastRemoteObject implements IBomber
                 }
             }
 
-            // Consumed bombs are reset for the next time this player receives a turn.
             current.setBombsPlantedThisTurn(0);
 
-            // --- 3. CONDIÇÃO DE VITÓRIA / TOGGLE DIRETO ---
             if (!p1.isVivo() && !p2.isVivo()) {
                 status = GameStatusEnum.FINISHED;
                 winnerId = "EMPATE";
@@ -309,7 +296,6 @@ public class BombermanServiceImpl extends UnicastRemoteObject implements IBomber
                 winnerName = p1.getNome();
                 report.append("Fim de partida: Vitória de ").append(winnerName).append("!");
             } else {
-                // Ambos vivos: Toggle direto entre P1 e P2
                 currentTurnPlayerId = opponent.getId();
                 opponent.setMaxMovement(PlayerDTO.INITIAL_MOVEMENT);
                 opponent.setMovementLeft(PlayerDTO.INITIAL_MOVEMENT);
@@ -345,20 +331,29 @@ public class BombermanServiceImpl extends UnicastRemoteObject implements IBomber
             if (disconnected == null) return;
 
             if (status == GameStatusEnum.IN_PROGRESS) {
-                disconnected.setVivo(false);
-                status = GameStatusEnum.FINISHED;
+                PlayerDTO remaining = players.stream()
+                        .filter(player -> !player.getId().equals(playerId))
+                        .findFirst()
+                        .orElse(null);
+                players.remove(disconnected);
+                clearExplosiveCells();
 
-                PlayerDTO p1 = players.get(0);
-                PlayerDTO p2 = players.get(1);
-                PlayerDTO remaining = playerId.equals(p1.getId()) ? p2 : p1;
-
-                winnerId = remaining.getId();
-                winnerName = remaining.getNome();
-                lastActionMessage = disconnected.getNome() + " desconectou-se. Vitória por W.O. de " + remaining.getNome() + "!";
+                if (remaining == null) {
+                    resetMatchInternal();
+                } else {
+                    status = GameStatusEnum.FINISHED;
+                    currentTurnPlayerId = null;
+                    winnerId = remaining.getId();
+                    winnerName = remaining.getNome();
+                    lastActionMessage = disconnected.getNome() + " desconectou-se. Vitória por W.O. de " + remaining.getNome() + "!";
+                }
             } else if (status == GameStatusEnum.WAITING_FOR_PLAYERS) {
                 players.remove(disconnected);
                 currentTurnPlayerId = null;
                 lastActionMessage = disconnected.getNome() + " desconectou-se antes do início. Aguardando jogadores...";
+                if (players.isEmpty()) {
+                    resetMatchInternal();
+                }
             } else if (status == GameStatusEnum.FINISHED) {
                 players.remove(disconnected);
                 if (players.isEmpty()) {
@@ -371,14 +366,17 @@ public class BombermanServiceImpl extends UnicastRemoteObject implements IBomber
     }
 
     @Override
-    public GameStateDTO reiniciarPartida() throws RemoteException {
+    public GameStateDTO reiniciarPartida() throws RemoteException, InvalidTurnException {
         lock.lock();
         try {
-            activeBombCoords.clear();
-            fireOnBoard = false;
-            initializeBoard(new Random());
+            if (status != GameStatusEnum.FINISHED) {
+                throw new InvalidTurnException("A partida só pode ser reiniciada depois de terminar.");
+            }
 
             if (players.size() == REQUIRED_PLAYERS) {
+                activeBombCoords.clear();
+                fireOnBoard = false;
+                initializeBoard(new Random());
                 for (int i = 0; i < players.size(); i++) {
                     PlayerDTO p = players.get(i);
                     p.setId("P" + (i + 1));
@@ -396,6 +394,8 @@ public class BombermanServiceImpl extends UnicastRemoteObject implements IBomber
                 winnerName = null;
                 turnNumber = 1;
                 lastActionMessage = "Revanche iniciada! Tabuleiro resetado. Vez de " + players.get(0).getNome() + ".";
+            } else if (players.size() == 1) {
+                prepareRematchWaitingForOpponent();
             } else {
                 resetMatchInternal();
             }
@@ -403,6 +403,41 @@ public class BombermanServiceImpl extends UnicastRemoteObject implements IBomber
             return snapshot();
         } finally {
             lock.unlock();
+        }
+    }
+
+    private void prepareRematchWaitingForOpponent() {
+        initializeBoard(new Random());
+        activeBombCoords.clear();
+        fireOnBoard = false;
+
+        PlayerDTO remaining = players.get(0);
+        int slotIndex = "P2".equals(remaining.getId()) ? 1 : 0;
+        remaining.setX(SPAWN_COORDS[slotIndex][0]);
+        remaining.setY(SPAWN_COORDS[slotIndex][1]);
+        remaining.setVivo(true);
+        remaining.setAp(PlayerDTO.INITIAL_AP);
+        remaining.setMaxMovement(PlayerDTO.INITIAL_MOVEMENT);
+        remaining.setMovementLeft(PlayerDTO.INITIAL_MOVEMENT);
+        remaining.setBombsPlantedThisTurn(0);
+
+        status = GameStatusEnum.WAITING_FOR_PLAYERS;
+        currentTurnPlayerId = null;
+        winnerId = null;
+        winnerName = null;
+        turnNumber = 0;
+        lastActionMessage = "Revanche preparada. Aguardando um novo oponente...";
+    }
+
+    private void clearExplosiveCells() {
+        activeBombCoords.clear();
+        fireOnBoard = false;
+        for (int y = 0; y < BOARD_SIZE; y++) {
+            for (int x = 0; x < BOARD_SIZE; x++) {
+                if (board[y][x] == GameStateDTO.CELL_BOMB || board[y][x] == GameStateDTO.CELL_FIRE) {
+                    board[y][x] = GameStateDTO.CELL_EMPTY;
+                }
+            }
         }
     }
 

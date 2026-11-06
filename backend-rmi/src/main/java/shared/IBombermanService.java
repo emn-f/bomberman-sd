@@ -10,5 +10,5 @@ public interface IBombermanService extends Remote {
     GameStateDTO confirmarTurno(String playerId) throws RemoteException, GameNotStartedException, InvalidTurnException;
     GameStateDTO obterEstadoJogo() throws RemoteException;
     void desconectarJogador(String playerId) throws RemoteException;
-    GameStateDTO reiniciarPartida() throws RemoteException;
+    GameStateDTO reiniciarPartida() throws RemoteException, InvalidTurnException;
 }

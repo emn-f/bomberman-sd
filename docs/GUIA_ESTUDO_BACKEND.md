@@ -55,7 +55,7 @@ public interface IBombermanService extends Remote {
     GameStateDTO confirmarTurno(String playerId) throws RemoteException, ...;
     GameStateDTO obterEstadoJogo() throws RemoteException;
     void desconectarJogador(String playerId) throws RemoteException;
-    GameStateDTO reiniciarPartida() throws RemoteException;
+    GameStateDTO reiniciarPartida() throws RemoteException, InvalidTurnException;
 }
 ```
 
@@ -164,7 +164,7 @@ flowchart TD
     E --> F{"Fase 3: Verificação de Sobrevivência"}
     F -- "!p1.vivo && !p2.vivo" --> G["status = FINISHED<br/>winnerId = 'EMPATE'"]
     F -- "Apenas 1 vivo" --> H["status = FINISHED<br/>winnerId = sobrevivente"]
-    F -- "Ambos vivos" --> I["Alterna currentTurnPlayerId para o oponente<br/>Calcula movimentos e bombas progressivas do próximo turno"]
+    F -- "Ambos vivos" --> I["Alterna currentTurnPlayerId para o oponente<br/>Restaura 4 passos e 1 bomba"]
 ```
 
 - **Como o loop da explosão em cruz funciona (linhas 247–274 de `BombermanServiceImpl.java`):**
@@ -174,14 +174,11 @@ flowchart TD
   - Se encontrar bloco destrutível (`CELL_DESTRUCTIBLE == 2`): transforma o bloco em fogo (`CELL_FIRE == 4`) e dá `break` (destrói o bloco, mas o fogo não atravessa para a casa de trás!).
   - Se for vazio: preenche com `CELL_FIRE == 4` e continua até `r = 2`.
 
-- **Progressão Dinâmica por Turno (`PlayerDTO.java`):**
-  Para tornar as partidas 1v1 mais rápidas e intensas conforme os turnos avançam, o método `confirmarTurno` calcula a quantidade de passos e bombas do próximo turno em `PlayerDTO`:
-  - `calculateMaxMovementForTurn(turno)`: Começa com **5 passos** no Turno 1 e aumenta progressivamente (`5 -> 8 -> 12 -> 17...`).
-  - `calculateBombAllowanceForTurn(turno)`: Começa com **1 bomba** no Turno 1, sobe para **2 bombas** nos turnos 2 a 4, **3 bombas** nos turnos 5 a 7, e assim por diante.
+- **Regras Fixas por Turno (`PlayerDTO.java`):** Cada jogador recebe **4 passos e 1 bomba por turno**. Ao confirmar o turno, `confirmarTurno` restaura esses valores para o próximo jogador; eles não aumentam conforme a partida avança.
 
 ### 4.6. Desconexão / W.O. (`desconectarJogador`) e Revanche (`reiniciarPartida`)
-- **`desconectarJogador`:** Se a partida estiver `IN_PROGRESS` e um jogador sair ou fechar a aba, o servidor declara imediatamente `status = FINISHED` e define o jogador que permaneceu conectado como vencedor por **W.O.**
-- **`reiniciarPartida`:** Permite que, ao acabar uma partida (`FINISHED`), qualquer jogador clique em "Jogar Novamente", reconstruindo o mapa `9x9`, revivendo `P1` em `[0,0]` e `P2` em `[8,8]` e iniciando uma nova partida sem precisar reiniciar o servidor RMI.
+- **`desconectarJogador`:** Durante `IN_PROGRESS`, remove quem saiu da lista de participantes, encerra a partida e declara o participante restante vencedor por **W.O.**. O botão "Sair" chama a ponte; ao fechar ou navegar para fora da página, o frontend também tenta avisar a ponte com `sendBeacon` no evento `pagehide`.
+- **`reiniciarPartida`:** Só aceita partidas em `FINISHED`; durante `IN_PROGRESS` ou `WAITING_FOR_PLAYERS`, lança `InvalidTurnException`. Se os dois jogadores continuam conectados, começa uma revanche imediatamente. Se um saiu, mantém e reposiciona o sobrevivente e volta para `WAITING_FOR_PLAYERS`, aguardando um novo oponente.
 
 ---
 
@@ -197,10 +194,11 @@ flowchart TD
    - *Resposta:* O `synchronized` nativo do Java não tem garantia de fila justa (*fairness*). Como o frontend faz *polling* a cada `300ms` em `obterEstadoJogo()`, o `ReentrantLock(true)` garante ordem FIFO estrita para as threads, evitando *starvation* das jogadas e deixando explícito o bloqueio e desbloqueio (`lock()` / ` finally { unlock() }`).
 
 4. **"Como os testes automatizados (`BombermanGameTest.java`) validam o backend?"**
-   - *Resposta:* Temos 6 testes JUnit 5 que instanciam `BombermanServiceImpl` com uma semente determinística (`new Random(12345)`) e testam:
+   - *Resposta:* Temos 10 testes JUnit 5 que instanciam `BombermanServiceImpl` com uma semente determinística (`new Random(12345)`) e testam:
      1. Bloqueio de ações antes do 2º jogador entrar (`GameNotStartedException`).
      2. Início automático na entrada do 2º jogador (`IN_PROGRESS`) e bloqueio do 3º jogador (`GameFullException`).
      3. Ciclo completo de turno: mover, plantar bomba, afastar em "L", explodir bloco e alternar turno (`P1 -> P2`).
-     4. Progressão dinâmica de passos (`5 -> 8 -> 12 -> 17 -> 23...`) e bombas por turno (`1 -> 2 -> 2 -> 2 -> 3...`).
-     5. Vitória por W.O. na desconexão (`desconectarJogador`).
-     6. Morte simultânea gerando `EMPATE`.
+     4. Regras fixas de 4 passos e 1 bomba por turno.
+     5. Vitória por W.O. e remoção de quem desconectou.
+     6. Recusa do reinício durante a partida, revanche com os dois participantes e espera por novo oponente após W.O.
+     7. Empate real por explosão, com jogadores deslocados pelas ações normais do jogo, e inicialização com `Random` nulo.
