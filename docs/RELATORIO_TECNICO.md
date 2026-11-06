@@ -9,11 +9,11 @@
 ### 1.1. Descrição do Jogo Escolhido
 O presente projeto consiste no desenvolvimento de uma versão distribuída, baseada em turnos, do clássico jogo **Bomberman**, adaptada especificamente para partidas competitivas no formato **1v1 estrito (exatamente dois jogadores)** em um tabuleiro matricial de dimensões **9x9**.
 
-Diferente do Bomberman tradicional em tempo real contínuo, a abordagem em turnos discretos usa regras fixas de **4 passos (`movementLeft`) e 1 bomba por turno (`AP`)**:
+Diferente do Bomberman tradicional em tempo real contínuo, esta versão usa turnos discretos com recursos fixos: cada jogador recebe **4 movimentos (`movementLeft`) e 1 AP por turno**, suficiente para plantar **no máximo 1 bomba**. AP não utilizado não acumula para o turno seguinte.
 - **Mapa e Spawns:** O tabuleiro `9x9` possui paredes fixas indestrutíveis (`1`) nas coordenadas onde linha e coluna são ambas ímpares, blocos destrutíveis (`2`) gerados nas demais posições e zonas seguras de nascimento: o **Jogador 1 (`P1`)** inicia no canto superior esquerdo `[0,0]` (com `[0,1]` e `[1,0]` livres) e o **Jogador 2 (`P2`)** inicia no canto inferior direito `[8,8]` (com `[8,7]` e `[7,8]` livres).
 - **Mecânica de Turno e Fuga:** No seu turno, o jogador pode se mover ortogonalmente consumindo seus passos disponíveis (`movementLeft`) e plantar bombas na sua posição atual consumindo `1 AP` por bomba. Plantar uma bomba **não encerra o turno imediatamente**, permitindo que o jogador utilize seus passos restantes para fugir em "L" do raio letal da explosão.
 - **Confirmação do Turno (`confirmarTurno`) e Detonação:** Ao emitir a confirmação de encerramento de turno, todas as bombas ativas no tabuleiro detonam simultaneamente em formato de cruz (alcance de 2 casas em cada direção ortogonal). Paredes indestrutíveis bloqueiam o fogo; blocos destrutíveis são destruídos e interrompem a propagação naquela direção; jogadores atingidos pelo fogo são eliminados.
-- **Limite por turno:** Cada jogador recebe **4 passos e 1 bomba**. Ao passar a vez, o servidor restaura esses valores para o próximo jogador; eles não escalam ao longo da partida.
+- **Recursos fixos por turno:** Cada turno restaura `movementLeft` e `maxMovement` para **4** e `AP` para **1**. O servidor limita cada jogador a **1 bomba por turno**, mesmo após a detonação das bombas da rodada. AP não utilizado não é acumulado.
 
 ### 1.2. Motivação da Escolha do Protocolo (Java RMI)
 A escolha do **Java Remote Method Invocation (Java RMI)** — implementação orientada a objetos do paradigma RPC (Remote Procedure Call) nativa da plataforma Java — fundamenta-se nos seguintes princípios técnicos e arquiteturais:

@@ -97,11 +97,19 @@ public class BombermanGameTest {
         PlayerDTO p1 = service.conectarJogador("P1");
         PlayerDTO p2 = service.conectarJogador("P2");
 
-        assertEquals(1, p1.getAp());
         assertEquals(4, p1.getMovementLeft());
+        assertEquals(4, p1.getMaxMovement());
+        assertEquals(1, p1.getAp());
         assertEquals(4, p2.getMovementLeft());
+        assertEquals(1, p2.getAp());
 
-        service.setCell(1, 1, GameStateDTO.CELL_EMPTY);
+        for (int x = 1; x <= 4; x++) {
+            service.setCell(x, 0, GameStateDTO.CELL_EMPTY);
+        }
+        service.setCell(3, 1, GameStateDTO.CELL_EMPTY);
+
+        service.mover(p1.getId(), DirectionEnum.RIGHT);
+        service.mover(p1.getId(), DirectionEnum.RIGHT);
         GameStateDTO state = service.plantarBomba(p1.getId());
         PlayerDTO p1AfterPlant = state.getPlayers().get(0);
         assertEquals(0, p1AfterPlant.getAp());
@@ -110,16 +118,24 @@ public class BombermanGameTest {
 
         service.mover(p1.getId(), DirectionEnum.RIGHT);
         service.mover(p1.getId(), DirectionEnum.DOWN);
+        state = service.obterEstadoJogo();
+        assertEquals(0, state.getPlayers().get(0).getMovementLeft());
+        assertThrows(NoMovementLeftException.class, () -> service.mover(p1.getId(), DirectionEnum.DOWN));
+
         state = service.confirmarTurno(p1.getId());
         PlayerDTO p2Turn = state.getPlayers().get(1);
+        assertEquals(p2.getId(), state.getCurrentTurnPlayerId());
         assertEquals(4, p2Turn.getMovementLeft());
+        assertEquals(4, p2Turn.getMaxMovement());
         assertEquals(1, p2Turn.getAp());
 
         state = service.confirmarTurno(p2.getId());
         PlayerDTO p1NextTurn = state.getPlayers().get(0);
+        assertEquals(p1.getId(), state.getCurrentTurnPlayerId());
         assertEquals(4, p1NextTurn.getMovementLeft());
         assertEquals(4, p1NextTurn.getMaxMovement());
         assertEquals(1, p1NextTurn.getAp());
+        assertEquals(0, p1NextTurn.getBombsPlantedThisTurn());
     }
 
     @Test

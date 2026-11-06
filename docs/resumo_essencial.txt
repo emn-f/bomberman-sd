@@ -4,7 +4,7 @@
 Versão distribuída em turnos do clássico Bomberman no formato 1v1 estrito em um tabuleiro 9x9:
 - Mapa e Spawns: Paredes fixas indestrutíveis nas coordenadas ímpares, blocos destrutíveis no restante do mapa e zonas seguras nos cantos (P1 em [0,0] e P2 em [8,8]).
 - Mecânica de Turno e Fuga: No seu turno, o jogador utiliza seus passos disponíveis (movementLeft) para se deslocar e usa seus pontos de ação/bombas do turno (AP) para plantar bombas (1 AP por bomba). Plantar uma bomba não encerra o turno, permitindo usar os passos restantes para fugir em "L" do raio de explosão.
-- Regras fixas por turno: Cada jogador recebe 4 passos e pode plantar 1 bomba. Ao confirmar o turno, o próximo jogador recebe novamente esses valores.
+- Recursos Fixos por Turno: Cada jogador recebe 4 passos e 1 AP (uma bomba) no início de cada turno. É permitido plantar no máximo 1 bomba por turno; AP não utilizado não acumula.
 - Confirmação e Detonação: Ao confirmar o fim do turno (confirmarTurno), todas as bombas ativas explodem em cruz (alcance de 2 casas). Paredes fixas bloqueiam o fogo; blocos destrutíveis são destruídos e param a propagação naquela direção; jogadores atingidos são eliminados.
 
 1.2. Motivação da Escolha do Protocolo (Java RMI)

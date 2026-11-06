@@ -79,6 +79,8 @@ export const HUD: React.FC<HUDProps> = ({
   const apCount = myPlayerInState?.ap ?? 0;
   const movementLeft = myPlayerInState?.movementLeft ?? 0;
   const maxMovement = myPlayerInState?.maxMovement ?? 4;
+  const missingPlayerId = gameState.players.some(player => player.id === 'P1') ? 'P2' : 'P1';
+  const missingBridgePort = missingPlayerId === 'P1' ? '8081' : '8082';
 
   const pad2 = (n: number) => String(n).padStart(2, '0');
 
@@ -276,10 +278,10 @@ export const HUD: React.FC<HUDProps> = ({
             <div className="bg-surface-container-lowest border border-dashed border-outline-variant p-3 flex flex-col items-center justify-center text-center">
               <span className="w-2 h-2 rounded-full bg-secondary animate-ping mb-1.5" />
               <span className="font-telemetry-sm text-telemetry-sm text-secondary font-bold">
-                AGUARDANDO P2
+                AGUARDANDO {missingPlayerId}
               </span>
               <span className="font-badge-code text-[9px] text-outline mt-1">
-                CONECTE NA PORTA :8082
+                CONECTE NA PORTA :{missingBridgePort}
               </span>
             </div>
           )}
@@ -310,7 +312,10 @@ export const HUD: React.FC<HUDProps> = ({
             <div className="flex items-center justify-between gap-2 px-2.5 py-1.5 bg-surface-container border border-secondary/60 text-secondary font-telemetry-sm text-[10px]">
               <span className="flex items-center gap-1.5 font-bold">
                 <Zap className="w-3.5 h-3.5 shrink-0" />
-                4 PASSOS · 1 BOMBA POR TURNO
+                REGRAS FIXAS: 4 PASSOS • 1 BOMBA POR TURNO
+              </span>
+              <span className="text-on-surface-variant font-mono">
+                [MAX: {maxMovement} PASSOS]
               </span>
             </div>
           </div>

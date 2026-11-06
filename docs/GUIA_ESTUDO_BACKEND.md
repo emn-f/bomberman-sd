@@ -174,7 +174,7 @@ flowchart TD
   - Se encontrar bloco destrutível (`CELL_DESTRUCTIBLE == 2`): transforma o bloco em fogo (`CELL_FIRE == 4`) e dá `break` (destrói o bloco, mas o fogo não atravessa para a casa de trás!).
   - Se for vazio: preenche com `CELL_FIRE == 4` e continua até `r = 2`.
 
-- **Regras Fixas por Turno (`PlayerDTO.java`):** Cada jogador recebe **4 passos e 1 bomba por turno**. Ao confirmar o turno, `confirmarTurno` restaura esses valores para o próximo jogador; eles não aumentam conforme a partida avança.
+- **Regras Fixas por Turno (`PlayerDTO.java`):** Cada turno restaura `movementLeft` e `maxMovement` para **4** e `ap` para **1**, permitindo no máximo **1 bomba por turno**. AP não utilizado não acumula.
 
 ### 4.6. Desconexão / W.O. (`desconectarJogador`) e Revanche (`reiniciarPartida`)
 - **`desconectarJogador`:** Durante `IN_PROGRESS`, remove quem saiu da lista de participantes, encerra a partida e declara o participante restante vencedor por **W.O.**. O botão "Sair" chama a ponte; ao fechar ou navegar para fora da página, o frontend também tenta avisar a ponte com `sendBeacon` no evento `pagehide`.

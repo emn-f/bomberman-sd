@@ -76,7 +76,7 @@ public class ClientBridgeMain {
             bombermanService = (IBombermanService) Naming.lookup(rmiUri);
             System.out.println("[Lookup] Stub remoto obtido com sucesso!");
 
-            HttpServer server = HttpServer.create(new InetSocketAddress(httpPort), 0);
+            HttpServer server = HttpServer.create(new InetSocketAddress("0.0.0.0", httpPort), 0);
             server.setExecutor(Executors.newCachedThreadPool());
 
             server.createContext("/api/connect", new ConnectHandler());
@@ -88,7 +88,7 @@ public class ClientBridgeMain {
             server.createContext("/api/restart", new RestartHandler());
 
             server.start();
-            System.out.println("[Bridge HTTP] Servidor HTTP local ativo em http://localhost:" + httpPort);
+            System.out.println("[Bridge HTTP] Servidor HTTP ativo em todas as interfaces na porta " + httpPort + ". Use o IP desta máquina para conexões na rede.");
             System.out.println("[Endpoints]");
             System.out.println("  POST /api/connect    -> Conectar jogador");
             System.out.println("  POST /api/move       -> Mover jogador (UP, DOWN, LEFT, RIGHT)");
