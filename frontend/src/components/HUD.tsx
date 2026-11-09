@@ -14,7 +14,8 @@ import {
   RotateCcw,
   Terminal,
   Zap,
-  Network
+  Network,
+  Timer
 } from 'lucide-react';
 
 interface HUDProps {
@@ -26,6 +27,7 @@ interface HUDProps {
   onRestartMatch: () => void;
   isActionLoading: boolean;
   errorMessage: string | null;
+  autoTurnCountdown?: boolean;
 }
 
 interface LogEntry {
@@ -43,7 +45,8 @@ export const HUD: React.FC<HUDProps> = ({
   onConfirmTurn,
   onRestartMatch,
   isActionLoading,
-  errorMessage
+  errorMessage,
+  autoTurnCountdown
 }) => {
   const [logs, setLogs] = useState<LogEntry[]>([]);
 
@@ -353,6 +356,19 @@ export const HUD: React.FC<HUDProps> = ({
             </span>
           </div>
 
+          {/* Auto-pass status banner */}
+          {autoTurnCountdown && (
+            <div className="mb-2.5 p-2 bg-secondary/15 border border-secondary text-secondary font-telemetry-sm text-xs flex items-center justify-between animate-pulse rounded">
+              <span className="flex items-center gap-1.5 font-bold">
+                <Zap className="w-3.5 h-3.5 text-secondary shrink-0" />
+                Ações esgotadas (0 Passos, 0 AP) • Finalizando turno em 1s...
+              </span>
+              <span className="font-badge-code text-[9px] bg-secondary text-surface-container-lowest px-1.5 py-0.5 font-black uppercase">
+                AUTO-PASS
+              </span>
+            </div>
+          )}
+
           <div className="flex items-center justify-between gap-3">
             {/* Arcade D-Pad (Left) */}
             <div className="w-32 h-32 relative bg-surface-container-lowest border border-outline-variant p-1 flex items-center justify-center shrink-0">
@@ -434,13 +450,25 @@ export const HUD: React.FC<HUDProps> = ({
               <button
                 onClick={onConfirmTurn}
                 disabled={!isMyTurn || !isAlive || isActionLoading}
-                className="chamfer-btn w-full bg-primary-container text-surface-container-lowest font-headline-sm font-bold py-3 px-3 flex items-center justify-between border-t border-white hover:brightness-110 active:scale-[0.98] disabled:opacity-30 disabled:pointer-events-none transition-all shadow-[0_0_15px_rgba(0,245,255,0.65)]"
+                className={`chamfer-btn w-full font-headline-sm font-bold py-3 px-3 flex items-center justify-between border-t active:scale-[0.98] disabled:opacity-30 disabled:pointer-events-none transition-all ${
+                  autoTurnCountdown
+                    ? 'bg-secondary text-surface-container-lowest border-yellow-300 shadow-[0_0_20px_rgba(238,152,0,0.8)] animate-pulse'
+                    : 'bg-primary-container text-surface-container-lowest border-white hover:brightness-110 shadow-[0_0_15px_rgba(0,245,255,0.65)]'
+                }`}
               >
                 <div className="flex items-center gap-2">
-                  <Rocket className="w-5 h-5 shrink-0" />
+                  {autoTurnCountdown ? (
+                    <Timer className="w-5 h-5 shrink-0 animate-spin text-surface-container-lowest" />
+                  ) : (
+                    <Rocket className="w-5 h-5 shrink-0" />
+                  )}
                   <div className="flex flex-col text-left">
-                    <span className="leading-tight text-[12px] font-extrabold">CONFIRMAR TURNO</span>
-                    <span className="text-[9px] font-telemetry-sm opacity-90">PASSAR / DETONAR</span>
+                    <span className="leading-tight text-[12px] font-extrabold">
+                      {autoTurnCountdown ? 'AUTO-FINALIZANDO...' : 'CONFIRMAR TURNO'}
+                    </span>
+                    <span className="text-[9px] font-telemetry-sm opacity-90">
+                      {autoTurnCountdown ? 'SEM AÇÕES (1s)' : 'PASSAR / DETONAR'}
+                    </span>
                   </div>
                 </div>
                 <kbd className="bg-surface-container-lowest/85 text-primary-fixed text-[9px] font-telemetry-sm px-1.5 py-0.5">

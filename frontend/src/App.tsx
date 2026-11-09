@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { BridgeApi } from './api';
 import { GameBoardCanvas } from './components/GameBoardCanvas';
 import { HUD } from './components/HUD';
-import { Direction, GameStateDTO, PlayerDTO } from './types';
+import { Direction, GameStateDTO, PlayerDTO, CELL } from './types';
 import { ArrowRight, RefreshCw, Power, ShieldAlert } from 'lucide-react';
 
 export const App: React.FC = () => {
@@ -13,9 +13,21 @@ export const App: React.FC = () => {
   const [isConnecting, setIsConnecting] = useState<boolean>(false);
   const [isActionLoading, setIsActionLoading] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [autoTurnCountdown, setAutoTurnCountdown] = useState<boolean>(false);
 
   const apiRef = useRef<BridgeApi>(new BridgeApi(bridgeUrl));
   const errorTimeoutRef = useRef<number | null>(null);
+  const autoTurnTimeoutRef = useRef<number | null>(null);
+  const autoTurnScheduledRef = useRef<string | null>(null);
+
+  const clearAutoTurnTimer = useCallback(() => {
+    if (autoTurnTimeoutRef.current) {
+      clearTimeout(autoTurnTimeoutRef.current);
+      autoTurnTimeoutRef.current = null;
+    }
+    autoTurnScheduledRef.current = null;
+    setAutoTurnCountdown(false);
+  }, []);
 
   const showError = useCallback((msg: string) => {
     setErrorMessage(msg);
@@ -55,6 +67,7 @@ export const App: React.FC = () => {
 
   // Disconnect player
   const handleDisconnect = async () => {
+    clearAutoTurnTimer();
     if (!localPlayer) return;
     try {
       await apiRef.current.disconnect(localPlayer.id);
@@ -99,6 +112,7 @@ export const App: React.FC = () => {
   // Action: Confirm Turn
   const handleConfirmTurn = useCallback(async () => {
     if (!localPlayer || isActionLoading) return;
+    clearAutoTurnTimer();
     setIsActionLoading(true);
     try {
       const newState = await apiRef.current.confirmTurn(localPlayer.id);
@@ -109,11 +123,12 @@ export const App: React.FC = () => {
     } finally {
       setIsActionLoading(false);
     }
-  }, [localPlayer, isActionLoading, showError]);
+  }, [localPlayer, isActionLoading, clearAutoTurnTimer, showError]);
 
   // Action: Restart Match (Rematch)
   const handleRestartMatch = useCallback(async () => {
     if (!localPlayer || isActionLoading) return;
+    clearAutoTurnTimer();
     setIsActionLoading(true);
     try {
       const newState = await apiRef.current.restartMatch();
@@ -124,7 +139,72 @@ export const App: React.FC = () => {
     } finally {
       setIsActionLoading(false);
     }
-  }, [localPlayer, isActionLoading, showError]);
+  }, [localPlayer, isActionLoading, clearAutoTurnTimer, showError]);
+
+  // Auto-finalização do turno após 1 segundo se não houver mais ações disponíveis
+  useEffect(() => {
+    if (!localPlayer || !gameState || gameState.status !== 'IN_PROGRESS' || isActionLoading) {
+      return;
+    }
+
+    const isMyTurn = gameState.currentTurnPlayerId === localPlayer.id;
+    const myPlayer = gameState.players.find(p => p.id === localPlayer.id);
+
+    if (!isMyTurn || !myPlayer || !myPlayer.vivo) {
+      clearAutoTurnTimer();
+      return;
+    }
+
+    // Condição: Sem ações possíveis (0 passos e 0 AP para bomba, ou na mesma célula de uma bomba sem passos)
+    const noMovement = myPlayer.movementLeft <= 0;
+    const currentCellHasBomb =
+      gameState.board[myPlayer.y] &&
+      gameState.board[myPlayer.y][myPlayer.x] === CELL.BOMB;
+    const hasNoActionsLeft = noMovement && (myPlayer.ap <= 0 || currentCellHasBomb);
+
+    const currentTurnKey = `${localPlayer.id}-turn-${gameState.turnNumber}`;
+
+    if (hasNoActionsLeft) {
+      if (autoTurnScheduledRef.current !== currentTurnKey) {
+        autoTurnScheduledRef.current = currentTurnKey;
+        setAutoTurnCountdown(true);
+
+        if (autoTurnTimeoutRef.current) {
+          clearTimeout(autoTurnTimeoutRef.current);
+        }
+
+        autoTurnTimeoutRef.current = window.setTimeout(async () => {
+          autoTurnTimeoutRef.current = null;
+          setAutoTurnCountdown(false);
+          if (!localPlayer) return;
+
+          setIsActionLoading(true);
+          try {
+            const newState = await apiRef.current.confirmTurn(localPlayer.id);
+            setGameState(newState);
+            setErrorMessage(null);
+          } catch (err: any) {
+            showError(err.message || 'Falha ao confirmar turno automaticamente.');
+          } finally {
+            setIsActionLoading(false);
+          }
+        }, 1000);
+      }
+    } else {
+      if (autoTurnScheduledRef.current) {
+        clearAutoTurnTimer();
+      }
+    }
+  }, [gameState, localPlayer, isActionLoading, clearAutoTurnTimer, showError]);
+
+  // Cleanup do timer no unmount
+  useEffect(() => {
+    return () => {
+      if (autoTurnTimeoutRef.current) {
+        clearTimeout(autoTurnTimeoutRef.current);
+      }
+    };
+  }, []);
 
   // Polling: 300ms interval for real-time game state synchronization
   useEffect(() => {
@@ -385,6 +465,7 @@ export const App: React.FC = () => {
             onRestartMatch={handleRestartMatch}
             isActionLoading={isActionLoading}
             errorMessage={errorMessage}
+            autoTurnCountdown={autoTurnCountdown}
           />
         </main>
       )}
