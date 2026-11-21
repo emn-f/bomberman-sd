@@ -39,7 +39,6 @@ public class ClientBridgeMain {
         int rmiPort = 1099;
         int httpPort = 8081;
 
-        // Parse CLI args if present: -rmiHost, -rmiPort, -httpPort or positional [httpPort] [rmiPort] [rmiHost]
         for (int i = 0; i < args.length; i++) {
             if ("-rmiHost".equalsIgnoreCase(args[i]) && i + 1 < args.length) {
                 rmiHost = args[++i];
@@ -72,17 +71,14 @@ public class ClientBridgeMain {
         System.out.println("Local HTTP Bridge Port: " + httpPort);
 
         try {
-            // Lookup RMI Remote Stub
             rmiUri = "rmi://" + rmiHost + ":" + rmiPort + "/BombermanService";
             System.out.println("[Lookup] Conectando ao servidor RMI em " + rmiUri + "...");
             bombermanService = (IBombermanService) Naming.lookup(rmiUri);
             System.out.println("[Lookup] Stub remoto obtido com sucesso!");
 
-            // Create local HTTP Server
-            HttpServer server = HttpServer.create(new InetSocketAddress(httpPort), 0);
+            HttpServer server = HttpServer.create(new InetSocketAddress("0.0.0.0", httpPort), 0);
             server.setExecutor(Executors.newCachedThreadPool());
 
-            // Register handlers
             server.createContext("/api/connect", new ConnectHandler());
             server.createContext("/api/move", new MoveHandler());
             server.createContext("/api/bomb", new BombHandler());
@@ -92,7 +88,7 @@ public class ClientBridgeMain {
             server.createContext("/api/restart", new RestartHandler());
 
             server.start();
-            System.out.println("[Bridge HTTP] Servidor HTTP local ativo em http://localhost:" + httpPort);
+            System.out.println("[Bridge HTTP] Servidor HTTP ativo em todas as interfaces na porta " + httpPort + ". Use o IP desta máquina para conexões na rede.");
             System.out.println("[Endpoints]");
             System.out.println("  POST /api/connect    -> Conectar jogador");
             System.out.println("  POST /api/move       -> Mover jogador (UP, DOWN, LEFT, RIGHT)");
@@ -104,7 +100,6 @@ public class ClientBridgeMain {
             System.out.println("[Aviso] Pressione Ctrl+C para encerrar o bridge.");
             System.out.println("==================================================");
 
-            // Keep bridge alive indefinitely
             Thread.currentThread().join();
 
         } catch (InterruptedException e) {
@@ -154,8 +149,6 @@ public class ClientBridgeMain {
             return new String(is.readAllBytes(), StandardCharsets.UTF_8);
         }
     }
-
-    // --- HANDLERS ---
 
     static class ConnectHandler implements HttpHandler {
         @Override
@@ -340,6 +333,8 @@ public class ClientBridgeMain {
                     GameStateDTO state = refreshService().reiniciarPartida();
                     sendJsonResponse(exchange, 200, state);
                 }
+            } catch (InvalidTurnException e) {
+                sendErrorResponse(exchange, 400, e.getMessage());
             } catch (Exception e) {
                 sendErrorResponse(exchange, 500, "Erro ao reiniciar partida: " + e.getMessage());
             }

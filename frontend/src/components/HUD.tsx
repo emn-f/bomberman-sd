@@ -81,22 +81,21 @@ export const HUD: React.FC<HUDProps> = ({
 
   const apCount = myPlayerInState?.ap ?? 0;
   const movementLeft = myPlayerInState?.movementLeft ?? 0;
-  const maxMovement = myPlayerInState?.maxMovement ?? 5;
+  const maxMovement = myPlayerInState?.maxMovement ?? 4;
   const myTurnsPlayed = myPlayerInState?.turnsPlayed ?? 1;
+  const missingPlayerId = gameState.players.some(player => player.id === 'P1') ? 'P2' : 'P1';
+  const missingBridgePort = missingPlayerId === 'P1' ? '8081' : '8082';
 
-  // Format padded numbers like 03 AP, 04 / 12
   const pad2 = (n: number) => String(n).padStart(2, '0');
 
   return (
     <aside className="flex flex-col justify-between w-full lg:w-[430px] border border-outline-variant bg-surface-container p-4 z-40 shadow-2xl relative">
-      {/* Cybernetic Corner Ticks */}
       <span className="absolute top-1 left-1 font-badge-code text-badge-code text-primary-container select-none">+</span>
       <span className="absolute top-1 right-1 font-badge-code text-badge-code text-primary-container select-none">+</span>
       <span className="absolute bottom-1 left-1 font-badge-code text-badge-code text-primary-container select-none">+</span>
       <span className="absolute bottom-1 right-1 font-badge-code text-badge-code text-primary-container select-none">+</span>
 
       <div className="flex flex-col gap-3.5">
-        {/* Console Header */}
         <div className="flex items-center justify-between pb-2.5 border-b border-outline-variant">
           <div className="flex items-center gap-2.5">
             <div className="w-7 h-7 bg-surface-container-high border border-primary-container flex items-center justify-center text-primary-container">
@@ -116,7 +115,6 @@ export const HUD: React.FC<HUDProps> = ({
           </span>
         </div>
 
-        {/* Match Result Banner (Victory / Defeat / Draw) */}
         {gameState.status === 'FINISHED' && (() => {
           const isDraw = gameState.winnerId === 'EMPATE';
           const isWinner = !isDraw && localPlayer && gameState.winnerId === localPlayer.id;
@@ -172,13 +170,12 @@ export const HUD: React.FC<HUDProps> = ({
           );
         })()}
 
-        {/* SECTION A: 1v1 Combatants Telemetry Cards (P1 vs P2) */}
         <div className="grid grid-cols-2 gap-2.5">
           {gameState.players.map((p) => {
             const isThisLocal = localPlayer?.id === p.id;
             const isThisTurn = gameState.currentTurnPlayerId === p.id && gameState.status === 'IN_PROGRESS';
             const isP1 = p.id === 'P1';
-            const pMaxMove = p.maxMovement ?? 5;
+            const pMaxMove = p.maxMovement ?? 4;
             const stepPct = Math.min(100, Math.max(0, Math.round((p.movementLeft / pMaxMove) * 100)));
 
             return (
@@ -228,7 +225,6 @@ export const HUD: React.FC<HUDProps> = ({
                   {p.nome}
                 </div>
 
-                {/* Turn Mobility Bar */}
                 <div className="mt-2">
                   <div className="flex justify-between text-[10px] font-telemetry-sm mb-0.5">
                     <span className="text-on-surface-variant">MOBILIDADE</span>
@@ -248,7 +244,6 @@ export const HUD: React.FC<HUDProps> = ({
                   </div>
                 </div>
 
-                {/* Bomb Stock & Position */}
                 <div className="mt-2.5 flex items-center justify-between border-t border-outline-variant/50 pt-2">
                   <div>
                     <span className="text-[9px] font-telemetry-sm text-on-surface-variant block">
@@ -279,6 +274,7 @@ export const HUD: React.FC<HUDProps> = ({
                     </span>
                   </div>
                 </div>
+
               </div>
             );
           })}
@@ -286,20 +282,18 @@ export const HUD: React.FC<HUDProps> = ({
             <div className="bg-surface-container-lowest border border-dashed border-outline-variant p-3 flex flex-col items-center justify-center text-center">
               <span className="w-2 h-2 rounded-full bg-secondary animate-ping mb-1.5" />
               <span className="font-telemetry-sm text-telemetry-sm text-secondary font-bold">
-                AGUARDANDO P2
+                AGUARDANDO {missingPlayerId}
               </span>
               <span className="font-badge-code text-[9px] text-outline mt-1">
-                CONECTE NA PORTA :8082
+                CONECTE NA PORTA :{missingBridgePort}
               </span>
             </div>
           )}
         </div>
 
-        {/* SECTION B: Local Player Telemetry & Progressive Turn Scaling */}
         {myPlayerInState && (
           <div className="bg-surface-container-low border border-outline-variant p-3">
             <div className="grid grid-cols-2 gap-2.5 mb-2.5">
-              {/* Available Bombs (AP) */}
               <div className="bg-surface-container-lowest border border-outline-variant p-2 flex flex-col items-center">
                 <span className="text-[10px] font-telemetry-sm text-on-surface-variant">
                   BOMBAS DISPONÍVEIS
@@ -309,7 +303,6 @@ export const HUD: React.FC<HUDProps> = ({
                 </span>
               </div>
 
-              {/* Remaining Steps */}
               <div className="bg-surface-container-lowest border border-outline-variant p-2 flex flex-col items-center">
                 <span className="text-[10px] font-telemetry-sm text-on-surface-variant">
                   PASSOS RESTANTES
@@ -320,20 +313,18 @@ export const HUD: React.FC<HUDProps> = ({
               </div>
             </div>
 
-            {/* Active Progression Rule Badge */}
             <div className="flex items-center justify-between gap-2 px-2.5 py-1.5 bg-surface-container border border-secondary/60 text-secondary font-telemetry-sm text-[10px]">
               <span className="flex items-center gap-1.5 font-bold">
                 <Zap className="w-3.5 h-3.5 shrink-0" />
-                ESCALONAMENTO ATIVO (SEU TURNO #{myTurnsPlayed})
+                ESCALONAMENTO (TURNO #{myTurnsPlayed})
               </span>
               <span className="text-on-surface-variant font-mono">
-                [MAX: {maxMovement} PASSOS]
+                [PASSOS: {maxMovement}/6 • BOMBAS: {myTurnsPlayed >= 4 ? 2 : 1}/2]
               </span>
             </div>
           </div>
         )}
 
-        {/* Error Alert Banner */}
         {errorMessage && (
           <div className="p-2.5 bg-error-container/40 border border-on-tertiary-container text-on-error-container font-telemetry-sm text-xs flex items-center gap-2">
             <ShieldAlert className="w-4 h-4 shrink-0 text-error" />
@@ -341,7 +332,6 @@ export const HUD: React.FC<HUDProps> = ({
           </div>
         )}
 
-        {/* SECTION C: Tactical D-Pad & Arcade Action Deck */}
         <div className="bg-surface-container-high border border-outline-variant p-3">
           <div className="flex items-center justify-between mb-2.5 pb-1 border-b border-outline-variant/60">
             <span className="font-telemetry-sm text-telemetry-sm text-on-surface-variant font-bold">
@@ -370,9 +360,7 @@ export const HUD: React.FC<HUDProps> = ({
           )}
 
           <div className="flex items-center justify-between gap-3">
-            {/* Arcade D-Pad (Left) */}
             <div className="w-32 h-32 relative bg-surface-container-lowest border border-outline-variant p-1 flex items-center justify-center shrink-0">
-              {/* Up (W) */}
               <button
                 onClick={() => onMove('UP')}
                 disabled={!isMyTurn || !isAlive || movementLeft <= 0 || isActionLoading}
@@ -383,7 +371,6 @@ export const HUD: React.FC<HUDProps> = ({
                 <span className="font-badge-code text-[8px] font-bold leading-none mt-0.5">W</span>
               </button>
 
-              {/* Left (A) */}
               <button
                 onClick={() => onMove('LEFT')}
                 disabled={!isMyTurn || !isAlive || movementLeft <= 0 || isActionLoading}
@@ -394,7 +381,6 @@ export const HUD: React.FC<HUDProps> = ({
                 <span className="font-badge-code text-[8px] font-bold leading-none mt-0.5">A</span>
               </button>
 
-              {/* Center Pivot */}
               <div className="w-6 h-6 bg-surface-container-high border border-outline flex items-center justify-center">
                 <span
                   className={`w-1.5 h-1.5 ${
@@ -403,7 +389,6 @@ export const HUD: React.FC<HUDProps> = ({
                 />
               </div>
 
-              {/* Right (D) */}
               <button
                 onClick={() => onMove('RIGHT')}
                 disabled={!isMyTurn || !isAlive || movementLeft <= 0 || isActionLoading}
@@ -414,7 +399,6 @@ export const HUD: React.FC<HUDProps> = ({
                 <span className="font-badge-code text-[8px] font-bold leading-none mt-0.5">D</span>
               </button>
 
-              {/* Down (S) */}
               <button
                 onClick={() => onMove('DOWN')}
                 disabled={!isMyTurn || !isAlive || movementLeft <= 0 || isActionLoading}
@@ -426,9 +410,7 @@ export const HUD: React.FC<HUDProps> = ({
               </button>
             </div>
 
-            {/* Prominent Arcade Action Buttons (Right) */}
             <div className="flex-1 flex flex-col gap-2.5">
-              {/* Button 1: Plant Bomb (-1 AP) */}
               <button
                 onClick={onPlantBomb}
                 disabled={!isMyTurn || !isAlive || apCount < 1 || isActionLoading}
@@ -446,7 +428,6 @@ export const HUD: React.FC<HUDProps> = ({
                 </kbd>
               </button>
 
-              {/* Button 2: Confirm Turn / Detonate */}
               <button
                 onClick={onConfirmTurn}
                 disabled={!isMyTurn || !isAlive || isActionLoading}
@@ -479,7 +460,6 @@ export const HUD: React.FC<HUDProps> = ({
           </div>
         </div>
 
-        {/* SECTION D: RMI Session Event Log */}
         <div className="bg-surface-container-lowest border border-outline-variant p-3 flex flex-col">
           <div className="flex items-center justify-between pb-1.5 border-b border-outline-variant/60 mb-2">
             <span className="font-telemetry-sm text-telemetry-sm text-on-surface-variant flex items-center gap-1.5">
@@ -519,18 +499,6 @@ export const HUD: React.FC<HUDProps> = ({
         </div>
       </div>
 
-      {/* Console Footer Actions */}
-      <div className="pt-3 border-t border-outline-variant flex items-center justify-between gap-2 mt-3">
-        <button
-          onClick={onRestartMatch}
-          disabled={isActionLoading}
-          title="Reiniciar partida no servidor RMI"
-          className="flex-1 py-1.5 px-3 bg-surface-container-high border border-outline-variant text-on-surface-variant font-telemetry-sm text-telemetry-sm hover:border-primary-container hover:text-primary-container transition-colors flex items-center justify-center gap-1.5 disabled:opacity-40"
-        >
-          <RotateCcw className="w-3.5 h-3.5" />
-          REINICIAR PARTIDA / REVANCHE
-        </button>
-      </div>
     </aside>
   );
 };

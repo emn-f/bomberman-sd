@@ -6,8 +6,9 @@ public class PlayerDTO implements Serializable {
     private static final long serialVersionUID = 1L;
 
     public static final int INITIAL_AP = 1;
-    public static final int MAX_AP = 5;
-    public static final int INITIAL_MOVEMENT = 5;
+    public static final int MAX_AP = 2;
+    public static final int INITIAL_MOVEMENT = 4;
+    public static final int MAX_MOVEMENT = 6;
 
     private String id;
     private String nome;
@@ -38,15 +39,11 @@ public class PlayerDTO implements Serializable {
 
     public static int calculateMaxMovementForTurn(int playerTurnNumber) {
         if (playerTurnNumber <= 1) return INITIAL_MOVEMENT;
-        int n = playerTurnNumber;
-        // Turn 1: 5 | Turn 2: 8 (+3) | Turn 3: 12 (+4) | Turn 4: 17 (+5) ...
-        return INITIAL_MOVEMENT + ((n - 1) * (n + 4)) / 2;
+        return Math.min(MAX_MOVEMENT, INITIAL_MOVEMENT + (playerTurnNumber - 1));
     }
 
     public static int calculateBombAllowanceForTurn(int playerTurnNumber) {
-        if (playerTurnNumber <= 1) return 1;
-        // Turno 1: 1 | Turnos 2,3,4: 2 | Turnos 5,6,7: 3 | Turnos 8,9,10: 4 ...
-        return 2 + (playerTurnNumber - 2) / 3;
+        return playerTurnNumber >= 4 ? MAX_AP : INITIAL_AP;
     }
 
     public String getId() {

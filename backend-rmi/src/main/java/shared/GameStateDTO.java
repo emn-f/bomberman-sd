@@ -116,4 +116,5 @@ public class GameStateDTO implements Serializable {
     public void setLastActionMessage(String lastActionMessage) {
         this.lastActionMessage = lastActionMessage;
     }
+
 }

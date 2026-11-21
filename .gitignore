@@ -19,3 +19,7 @@ yarn-error.log*
 .DS_Store
 *.log
 .system_generated/
+
+# Documentos auxiliares locais (manter apenas os PDFs das entregas versionados em docs/)
+docs/*.md
+docs/*.txt

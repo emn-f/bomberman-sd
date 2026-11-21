@@ -24,7 +24,6 @@ public class ServerMain {
             System.out.println("   BOMBERMAN MULTIPLAYER RMI SERVER - INICIANDO   ");
             System.out.println("==================================================");
 
-            // Create or get local RMI Registry
             Registry registry;
             try {
                 registry = LocateRegistry.createRegistry(port);
@@ -34,17 +33,14 @@ public class ServerMain {
                 System.out.println("[RMI Registry] Conectado ao Registry existente na porta " + port);
             }
 
-            // Instantiate service
             IBombermanService service = new BombermanServiceImpl();
 
-            // Rebind service
             registry.rebind(SERVICE_NAME, service);
             System.out.println("[RMI Service] Servidor registrado com o nome: '" + SERVICE_NAME + "'");
             System.out.println("[Status] Servidor pronto para aceitar conexões de jogadores.");
             System.out.println("[Aviso] Pressione Ctrl+C para encerrar o servidor.");
             System.out.println("==================================================");
 
-            // Keep server alive indefinitely
             Thread.currentThread().join();
 
         } catch (InterruptedException e) {

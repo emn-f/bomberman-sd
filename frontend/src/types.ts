@@ -16,7 +16,7 @@ export interface PlayerDTO {
 }
 
 export interface GameStateDTO {
-  board: number[][]; // 9x9 matrix: 0=empty, 1=wall, 2=destructible, 3=bomb, 4=fire
+  board: number[][];
   players: PlayerDTO[];
   currentTurnPlayerId: string | null;
   status: GameStatus;

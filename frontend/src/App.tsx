@@ -5,8 +5,11 @@ import { HUD } from './components/HUD';
 import { Direction, GameStateDTO, PlayerDTO, CELL } from './types';
 import { ArrowRight, RefreshCw, Power, ShieldAlert } from 'lucide-react';
 
+const bridgeUrlForPort = (port: number) =>
+  `http://${window.location.hostname || 'localhost'}:${port}`;
+
 export const App: React.FC = () => {
-  const [bridgeUrl, setBridgeUrl] = useState<string>('http://localhost:8081');
+  const [bridgeUrl, setBridgeUrl] = useState<string>(() => bridgeUrlForPort(8081));
   const [playerName, setPlayerName] = useState<string>('');
   const [localPlayer, setLocalPlayer] = useState<PlayerDTO | null>(null);
   const [gameState, setGameState] = useState<GameStateDTO | null>(null);
@@ -42,7 +45,6 @@ export const App: React.FC = () => {
     apiRef.current.setBaseUrl(url);
   };
 
-  // Connect player
   const handleConnect = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!playerName.trim()) {
@@ -65,7 +67,6 @@ export const App: React.FC = () => {
     }
   };
 
-  // Disconnect player
   const handleDisconnect = async () => {
     clearAutoTurnTimer();
     if (!localPlayer) return;
@@ -79,7 +80,21 @@ export const App: React.FC = () => {
     }
   };
 
-  // Action: Move
+  useEffect(() => {
+    if (!localPlayer) return;
+
+    const notifyDisconnect = () => {
+      const payload = new Blob(
+        [JSON.stringify({ playerId: localPlayer.id })],
+        { type: 'text/plain;charset=UTF-8' }
+      );
+      navigator.sendBeacon(`${apiRef.current.getBaseUrl()}/api/disconnect`, payload);
+    };
+
+    window.addEventListener('pagehide', notifyDisconnect);
+    return () => window.removeEventListener('pagehide', notifyDisconnect);
+  }, [localPlayer]);
+
   const handleMove = useCallback(async (dir: Direction) => {
     if (!localPlayer || isActionLoading) return;
     setIsActionLoading(true);
@@ -94,7 +109,6 @@ export const App: React.FC = () => {
     }
   }, [localPlayer, isActionLoading, showError]);
 
-  // Action: Plant Bomb
   const handlePlantBomb = useCallback(async () => {
     if (!localPlayer || isActionLoading) return;
     setIsActionLoading(true);
@@ -109,7 +123,6 @@ export const App: React.FC = () => {
     }
   }, [localPlayer, isActionLoading, showError]);
 
-  // Action: Confirm Turn
   const handleConfirmTurn = useCallback(async () => {
     if (!localPlayer || isActionLoading) return;
     clearAutoTurnTimer();
@@ -125,7 +138,6 @@ export const App: React.FC = () => {
     }
   }, [localPlayer, isActionLoading, clearAutoTurnTimer, showError]);
 
-  // Action: Restart Match (Rematch)
   const handleRestartMatch = useCallback(async () => {
     if (!localPlayer || isActionLoading) return;
     clearAutoTurnTimer();
@@ -206,7 +218,6 @@ export const App: React.FC = () => {
     };
   }, []);
 
-  // Polling: 300ms interval for real-time game state synchronization
   useEffect(() => {
     let isMounted = true;
     const interval = setInterval(async () => {
@@ -225,7 +236,6 @@ export const App: React.FC = () => {
           setGameState(state);
         }
       } catch (err) {
-        // Silently keep polling
       }
     }, 300);
 
@@ -235,7 +245,6 @@ export const App: React.FC = () => {
     };
   }, [localPlayer]);
 
-  // Keyboard controls listener (WASD, Arrows, Space, Enter)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
@@ -284,7 +293,6 @@ export const App: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-surface-container-lowest text-on-surface flex flex-col justify-between micro-dot-bg selection:bg-primary-container selection:text-surface-container-lowest">
-      {/* Header Minimalista */}
       <header className="w-full h-14 px-6 flex items-center justify-between border-b border-outline-variant/30 bg-surface-container-lowest/80 backdrop-blur-md sticky top-0 z-50">
         <div className="flex items-center gap-2">
           <span className="text-primary-container font-telemetry-md text-telemetry-md">❖</span>
@@ -316,16 +324,12 @@ export const App: React.FC = () => {
         </div>
       </header>
 
-      {/* Main Content */}
       {!localPlayer ? (
-        /* Lobby Minimalista */
         <main className="flex-1 flex items-center justify-center px-4 py-10">
           <div className="w-full max-w-[420px] bg-surface-container/90 border border-outline-variant/60 rounded-lg p-8 backdrop-blur-md shadow-2xl relative">
-            {/* Cantoneiras sutis */}
             <div className="absolute -top-px -left-px w-2.5 h-2.5 border-t-2 border-l-2 border-primary-container" />
             <div className="absolute -bottom-px -right-px w-2.5 h-2.5 border-b-2 border-r-2 border-primary-container" />
 
-            {/* Cabeçalho do Card */}
             <div className="text-center mb-6">
               <h1 className="font-headline-lg text-3xl font-bold text-on-surface tracking-tight">
                 Bomberman 1v1
@@ -342,9 +346,7 @@ export const App: React.FC = () => {
               </div>
             )}
 
-            {/* Formulário Minimalista */}
             <form onSubmit={handleConnect} className="space-y-5">
-              {/* Segmented Control: Escolha de Jogador e Porta */}
               <div>
                 <label className="block font-telemetry-sm text-telemetry-sm text-on-surface-variant uppercase mb-1.5 tracking-wider">
                   Alocação de Porta
@@ -352,7 +354,7 @@ export const App: React.FC = () => {
                 <div className="grid grid-cols-2 gap-1.5 p-1 bg-surface-container-lowest border border-outline-variant/40 rounded">
                   <button
                     type="button"
-                    onClick={() => handleBridgeUrlChange('http://localhost:8081')}
+                    onClick={() => handleBridgeUrlChange(bridgeUrlForPort(8081))}
                     className={`py-2.5 px-3 font-telemetry-md text-telemetry-md text-center rounded transition-all duration-150 ${
                       isPort8081
                         ? 'bg-surface-container-high text-primary-container border border-primary-container/40 shadow-sm font-semibold'
@@ -363,7 +365,7 @@ export const App: React.FC = () => {
                   </button>
                   <button
                     type="button"
-                    onClick={() => handleBridgeUrlChange('http://localhost:8082')}
+                    onClick={() => handleBridgeUrlChange(bridgeUrlForPort(8082))}
                     className={`py-2.5 px-3 font-telemetry-md text-telemetry-md text-center rounded transition-all duration-150 ${
                       isPort8082
                         ? 'bg-surface-container-high text-primary-container border border-primary-container/40 shadow-sm font-semibold'
@@ -375,7 +377,6 @@ export const App: React.FC = () => {
                 </div>
               </div>
 
-              {/* Campo de Texto: Apelido */}
               <div>
                 <label
                   htmlFor="nickname"
@@ -400,7 +401,6 @@ export const App: React.FC = () => {
                 </div>
               </div>
 
-              {/* Botão Primário: Entrar na Partida */}
               <button
                 type="submit"
                 disabled={isConnecting}
@@ -422,18 +422,16 @@ export const App: React.FC = () => {
           </div>
         </main>
       ) : (
-        /* Arena de Combate */
         <main className="flex-1 flex flex-col lg:flex-row items-center lg:items-start justify-center gap-6 p-4 lg:p-6 max-w-6xl mx-auto w-full">
-          {/* Coluna Esquerda: Tabuleiro 9x9 */}
           <section className="flex flex-col items-center">
-            {/* Barra de Status Compacta Acima do Tabuleiro */}
             <div className="w-full bg-surface-container border border-outline-variant/60 px-3.5 py-2 mb-3 flex items-center justify-between gap-2 rounded-t">
               <div className="flex items-center gap-2">
                 <span className="px-2 py-0.5 bg-surface-container-lowest border border-primary-container/60 font-telemetry-md text-xs text-primary-container font-bold">
                   TURNO #{String(gameState?.turnNumber || 1).padStart(2, '0')}
                 </span>
                 <span className="font-telemetry-sm text-xs text-on-surface-variant">
-                  {gameState?.status === 'WAITING_FOR_PLAYERS' && '⏳ Aguardando Jogador 2'}
+                  {gameState?.status === 'WAITING_FOR_PLAYERS' &&
+                    `⏳ Aguardando Jogador ${gameState.players.some(player => player.id === 'P1') ? '2' : '1'}`}
                   {gameState?.status === 'IN_PROGRESS' && '⚔️ Em Combate'}
                   {gameState?.status === 'FINISHED' && '🏆 Partida Finalizada'}
                 </span>
@@ -455,7 +453,6 @@ export const App: React.FC = () => {
             <GameBoardCanvas gameState={gameState} localPlayer={localPlayer} />
           </section>
 
-          {/* Coluna Direita: HUD */}
           <HUD
             gameState={gameState}
             localPlayer={localPlayer}
@@ -470,7 +467,6 @@ export const App: React.FC = () => {
         </main>
       )}
 
-      {/* Rodapé Ultraleve */}
       <footer className="w-full py-2.5 text-center font-telemetry-sm text-telemetry-sm text-on-surface-variant/40 select-none">
         <span>SISTEMAS DISTRIBUÍDOS // JAVA RMI</span>
       </footer>

@@ -17,7 +17,9 @@ Projeto de Bomberman Multiplayer baseado em turnos utilizando **Java RMI**, **Lo
 │       └── test/java/server/   # Testes unitários JUnit 5 de mecânicas e concorrência
 ├── frontend/                   # Aplicação React 18 + Vite + TypeScript + HTML5 Canvas
 ├── docs/
-│   └── RELATORIO_TECNICO.md    # Relatório Técnico completo (6 seções obrigatórias)
+│   ├── Projeto_II_Unidade_Entrega_1.pdf
+│   ├── Projeto_II_Unidade_Entrega_2.pdf
+│   └── Projeto_II_Unidade_Entrega_3.pdf
 ├── run-server.sh               # Script de execução rápida do Servidor RMI
 ├── run-bridge.sh               # Script de execução do Bridge Local
 └── run-frontend.sh             # Script de execução do Frontend Vite
@@ -56,15 +58,18 @@ cd frontend
 npm run dev
 ```
 
-Acesse `http://localhost:3000`:
-- **Aba 1:** Conecte no bridge `http://localhost:8081` (Jogador 1, P1). Fica em espera (`WAITING_FOR_PLAYERS`).
-- **Aba 2:** Altere o campo Bridge URL no topo para `http://localhost:8082` e conecte (Jogador 2, P2). O jogo inicia automaticamente (`IN_PROGRESS`).
+Acesse `http://localhost:3000` no computador que executa o projeto. Em outro computador na mesma rede, acesse `http://<IP-do-host>:3000`. A interface monta o endereço do bridge usando automaticamente o mesmo host e a porta escolhida (`8081` ou `8082`).
+- **Aba 1:** Selecione Jogador 1 e conecte. O jogo fica em espera (`WAITING_FOR_PLAYERS`).
+- **Aba 2 ou outro computador:** Selecione Jogador 2 e conecte. O jogo inicia automaticamente (`IN_PROGRESS`).
 
+Para acesso pela rede, permita no firewall do computador host as portas TCP `3000`, `8081` e `8082`.
 ---
 
 ## 🎮 Controles no Jogo
 
-- **Mover:** Teclas `W`, `A`, `S`, `D` ou Setas do teclado (ou botões no D-Pad da HUD). Consome 1 movimento de 5.
-- **Plantar Bomba:** Tecla `Espaço` ou botão **"Plantar Bomba (-1 AP)"**.
-- **Confirmar Turno:** Tecla `Enter` ou botão **"Confirmar Turno / Detonar"** (detona todas as bombas ativas em cruz de raio 2 e passa a vez).
-- **Economia de Bombas:** Passar o turno sem plantar bombas garante **+1 AP de bônus** extra para a próxima rodada!
+- **Mover:** Teclas `W`, `A`, `S`, `D` ou Setas do teclado (ou botões no D-Pad da HUD). Consome 1 passo por deslocamento.
+- **Plantar Bomba:** Tecla `Espaço` ou botão **"Plantar Bomba (-1 AP)"**. Consome 1 AP e não encerra o turno, permitindo usar os passos restantes para fuga em "L".
+- **Confirmar Turno:** Tecla `Enter` ou botão **"Confirmar Turno / Detonar"** (detona todas as bombas ativas em cruz de raio 2 e passa a vez). Quando o jogador esgota todos os passos e AP possíveis, a auto-finalização (`AUTO-PASS`) confirma o turno após 1 segundo.
+- **Progressão Balanceada por Turno:**
+  - **Passos:** inicia em **4** no Turno 1, sobe para **5** no Turno 2 e atinge o teto de **6 passos** a partir do Turno 3.
+  - **Bombas (AP):** **1 bomba** nos Turnos 1 a 3, subindo para o teto de **2 bombas** a partir do Turno 4 (AP não acumulado entre turnos).

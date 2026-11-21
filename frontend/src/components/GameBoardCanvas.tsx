@@ -8,7 +8,6 @@ interface GameBoardCanvasProps {
 
 const COLS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I'];
 const ROWS = ['1', '2', '3', '4', '5', '6', '7', '8', '9'];
-
 export const GameBoardCanvas: React.FC<GameBoardCanvasProps> = ({ gameState, localPlayer }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const animFrameRef = useRef<number>(0);
@@ -40,22 +39,18 @@ export const GameBoardCanvas: React.FC<GameBoardCanvasProps> = ({ gameState, loc
 
       const board = gameState.board;
 
-      // 1. Draw Tactical Obsidian Floor & Grid
       for (let y = 0; y < boardSize; y++) {
         for (let x = 0; x < boardSize; x++) {
           const px = x * cellSize;
           const py = y * cellSize;
 
-          // Subtle cyber checkerboard
           ctx.fillStyle = (x + y) % 2 === 0 ? '#121620' : '#0b0e15';
           ctx.fillRect(px, py, cellSize, cellSize);
 
-          // Grid border
           ctx.strokeStyle = 'rgba(58, 73, 74, 0.35)';
           ctx.lineWidth = 1;
           ctx.strokeRect(px, py, cellSize, cellSize);
 
-          // Center micro dot for empty walkable tiles
           if (board[y][x] === CELL.EMPTY) {
             ctx.fillStyle = 'rgba(132, 148, 149, 0.22)';
             ctx.beginPath();
@@ -65,7 +60,6 @@ export const GameBoardCanvas: React.FC<GameBoardCanvasProps> = ({ gameState, loc
         }
       }
 
-      // 2. Calculate Danger Zone for active bombs (cross range = 2)
       const dangerCells = new Set<string>();
       const bombPositions: { x: number; y: number }[] = [];
 
@@ -106,7 +100,6 @@ export const GameBoardCanvas: React.FC<GameBoardCanvasProps> = ({ gameState, loc
         }
       }
 
-      // 3. Draw Laser Crimson Danger Zone Overlay (Blast Trace)
       const dangerPulse = 0.28 + 0.16 * Math.sin(time * 7);
       dangerCells.forEach((coord) => {
         const [dx, dy] = coord.split(',').map(Number);
@@ -116,7 +109,6 @@ export const GameBoardCanvas: React.FC<GameBoardCanvasProps> = ({ gameState, loc
         ctx.fillStyle = `rgba(244, 63, 94, ${dangerPulse})`;
         ctx.fillRect(px, py, cellSize, cellSize);
 
-        // Tactical hazard diagonal stripes
         ctx.save();
         ctx.beginPath();
         ctx.rect(px, py, cellSize, cellSize);
@@ -131,13 +123,11 @@ export const GameBoardCanvas: React.FC<GameBoardCanvasProps> = ({ gameState, loc
         }
         ctx.restore();
 
-        // Crisp danger perimeter
         ctx.strokeStyle = 'rgba(244, 63, 94, 0.75)';
         ctx.lineWidth = 1;
         ctx.strokeRect(px + 0.5, py + 0.5, cellSize - 1, cellSize - 1);
       });
 
-      // 4. Draw Board Objects (Steel Pylons, Crates, Bombs, Fire)
       for (let y = 0; y < boardSize; y++) {
         for (let x = 0; x < boardSize; x++) {
           const px = x * cellSize;
@@ -145,7 +135,6 @@ export const GameBoardCanvas: React.FC<GameBoardCanvasProps> = ({ gameState, loc
           const cell = board[y][x];
 
           if (cell === CELL.WALL) {
-            // Indestructible Steel Pylon
             const grad = ctx.createRadialGradient(
               px + cellSize * 0.3,
               py + cellSize * 0.3,
@@ -163,12 +152,10 @@ export const GameBoardCanvas: React.FC<GameBoardCanvasProps> = ({ gameState, loc
             ctx.lineWidth = 1.5;
             ctx.strokeRect(px + 4, py + 4, cellSize - 8, cellSize - 8);
 
-            // Inner technical frame
             ctx.strokeStyle = 'rgba(132, 148, 149, 0.45)';
             ctx.lineWidth = 1;
             ctx.strokeRect(px + 10, py + 10, cellSize - 20, cellSize - 20);
 
-            // Corner rivets
             ctx.fillStyle = '#0b0e15';
             const rOff = 7;
             [
@@ -182,14 +169,12 @@ export const GameBoardCanvas: React.FC<GameBoardCanvasProps> = ({ gameState, loc
               ctx.fill();
             });
           } else if (cell === CELL.DESTRUCTIBLE) {
-            // Destructible Cyber Crate (Amber Industrial)
             const crateGrad = ctx.createLinearGradient(px, py, px + cellSize, py + cellSize);
             crateGrad.addColorStop(0, '#5b3800');
             crateGrad.addColorStop(1, '#2a1700');
             ctx.fillStyle = crateGrad;
             ctx.fillRect(px + 5, py + 5, cellSize - 10, cellSize - 10);
 
-            // Dashed amber border
             ctx.save();
             ctx.strokeStyle = '#ee9800';
             ctx.lineWidth = 1.5;
@@ -197,7 +182,6 @@ export const GameBoardCanvas: React.FC<GameBoardCanvasProps> = ({ gameState, loc
             ctx.strokeRect(px + 5, py + 5, cellSize - 10, cellSize - 10);
             ctx.restore();
 
-            // Inner cross reinforcement & label
             ctx.strokeStyle = 'rgba(255, 185, 95, 0.25)';
             ctx.lineWidth = 1;
             ctx.beginPath();
@@ -213,7 +197,6 @@ export const GameBoardCanvas: React.FC<GameBoardCanvasProps> = ({ gameState, loc
             ctx.textBaseline = 'middle';
             ctx.fillText('CRATE', px + cellSize / 2, py + cellSize / 2);
           } else if (cell === CELL.BOMB) {
-            // Active Cyber Ordnance
             const cx = px + cellSize / 2;
             const cy = py + cellSize / 2;
             const radius = (cellSize / 2) * 0.68;
@@ -223,11 +206,9 @@ export const GameBoardCanvas: React.FC<GameBoardCanvasProps> = ({ gameState, loc
             ctx.translate(cx, cy);
             ctx.scale(bombScale, bombScale);
 
-            // Outer lethal crimson aura
             ctx.shadowColor = '#f43f5e';
             ctx.shadowBlur = 14;
 
-            // Bomb core
             const bombGrad = ctx.createRadialGradient(-radius * 0.3, -radius * 0.3, 2, 0, 0, radius);
             bombGrad.addColorStop(0, '#475569');
             bombGrad.addColorStop(0.65, '#191b23');
@@ -237,14 +218,12 @@ export const GameBoardCanvas: React.FC<GameBoardCanvasProps> = ({ gameState, loc
             ctx.arc(0, 0, radius, 0, Math.PI * 2);
             ctx.fill();
 
-            // Neon ring on bomb
             ctx.strokeStyle = time % 0.3 > 0.15 ? '#00f5ff' : '#f43f5e';
             ctx.lineWidth = 2;
             ctx.beginPath();
             ctx.arc(0, 0, radius * 0.65, 0, Math.PI * 2);
             ctx.stroke();
 
-            // Sparking fuse emitter
             const sparkY = -radius * 1.1;
             ctx.fillStyle = time % 0.2 > 0.1 ? '#ffb95f' : '#ff4d6d';
             ctx.beginPath();
@@ -253,7 +232,6 @@ export const GameBoardCanvas: React.FC<GameBoardCanvasProps> = ({ gameState, loc
 
             ctx.restore();
           } else if (cell === CELL.FIRE) {
-            // Plasma Detonation Fire
             const cx = px + cellSize / 2;
             const cy = py + cellSize / 2;
             const fireRadius = (cellSize / 2) * (0.88 + 0.14 * Math.sin(time * 14 + (x + y)));
@@ -273,7 +251,6 @@ export const GameBoardCanvas: React.FC<GameBoardCanvasProps> = ({ gameState, loc
         }
       }
 
-      // 5. Draw Players (P1 Tactical Cyan vs P2 Laser Crimson)
       const players = gameState.players || [];
       players.forEach((p) => {
         const px = p.x * cellSize;
@@ -290,7 +267,6 @@ export const GameBoardCanvas: React.FC<GameBoardCanvasProps> = ({ gameState, loc
         ctx.save();
 
         if (!p.vivo) {
-          // Eliminated Operator Marker
           ctx.globalAlpha = 0.65;
           ctx.strokeStyle = '#f43f5e';
           ctx.lineWidth = 2;
@@ -305,7 +281,6 @@ export const GameBoardCanvas: React.FC<GameBoardCanvasProps> = ({ gameState, loc
           return;
         }
 
-        // Active Turn Highlight Cell Frame
         if (isCurrentTurn) {
           ctx.strokeStyle = primaryColor;
           ctx.lineWidth = 2;
@@ -314,25 +289,21 @@ export const GameBoardCanvas: React.FC<GameBoardCanvasProps> = ({ gameState, loc
           ctx.shadowBlur = 12 + 4 * Math.sin(time * 6);
         }
 
-        // Operator Chassis Body
         ctx.fillStyle = primaryColor;
         ctx.beginPath();
         ctx.arc(cx, cy + 2, cellSize * 0.3, 0, Math.PI * 2);
         ctx.fill();
 
-        // Tactical Helmet Dome
         ctx.fillStyle = '#e1e2ec';
         ctx.beginPath();
         ctx.arc(cx, cy - 4, cellSize * 0.21, 0, Math.PI * 2);
         ctx.fill();
 
-        // Cyber Visor
         ctx.fillStyle = darkColor;
         ctx.beginPath();
         ctx.roundRect(cx - cellSize * 0.16, cy - cellSize * 0.14, cellSize * 0.32, cellSize * 0.17, 3);
         ctx.fill();
 
-        // Glowing Visor Eyes
         ctx.fillStyle = '#ffffff';
         ctx.beginPath();
         ctx.arc(cx - 4, cy - 7.5, 2.2, 0, Math.PI * 2);
@@ -341,7 +312,6 @@ export const GameBoardCanvas: React.FC<GameBoardCanvasProps> = ({ gameState, loc
 
         ctx.restore();
 
-        // Tactical Callsign Tag
         ctx.save();
         ctx.font = 'bold 9px "JetBrains Mono", monospace';
         ctx.textAlign = 'center';
@@ -354,7 +324,6 @@ export const GameBoardCanvas: React.FC<GameBoardCanvasProps> = ({ gameState, loc
         ctx.fillStyle = isP1 ? '#0b0e15' : '#fff9f8';
         ctx.fillText(labelText, cx, py + cellSize - 4);
 
-        // Turn indicator chevron above current player
         if (isCurrentTurn) {
           const bounce = Math.sin(time * 8) * 2.5;
           ctx.fillStyle = '#ffb95f';
@@ -383,13 +352,11 @@ export const GameBoardCanvas: React.FC<GameBoardCanvasProps> = ({ gameState, loc
 
   return (
     <div className="relative bg-surface-container-lowest p-3 border-2 border-outline-variant shadow-2xl scanline-overlay">
-      {/* Cybernetic Corner Crosshairs */}
       <span className="absolute -top-2 -left-1.5 font-badge-code text-badge-code text-primary-container font-bold bg-surface-container-lowest px-0.5">[+]</span>
       <span className="absolute -top-2 -right-1.5 font-badge-code text-badge-code text-primary-container font-bold bg-surface-container-lowest px-0.5">[+]</span>
       <span className="absolute -bottom-2 -left-1.5 font-badge-code text-badge-code text-primary-container font-bold bg-surface-container-lowest px-0.5">[+]</span>
       <span className="absolute -bottom-2 -right-1.5 font-badge-code text-badge-code text-primary-container font-bold bg-surface-container-lowest px-0.5">[+]</span>
 
-      {/* Top Coordinate Ruler (A to I) */}
       <div className="flex ml-6 mb-1 w-[504px] justify-between text-center font-telemetry-sm text-telemetry-sm text-on-surface-variant font-bold">
         {COLS.map(col => (
           <span key={col} className="w-14">{col}</span>
@@ -397,14 +364,12 @@ export const GameBoardCanvas: React.FC<GameBoardCanvasProps> = ({ gameState, loc
       </div>
 
       <div className="flex items-center">
-        {/* Left Coordinate Ruler (1 to 9) */}
         <div className="flex flex-col mr-1.5 h-[504px] justify-between text-center font-telemetry-sm text-telemetry-sm text-on-surface-variant font-bold">
           {ROWS.map(row => (
             <span key={row} className="h-14 flex items-center justify-center w-4">{row}</span>
           ))}
         </div>
 
-        {/* 9x9 Combat Matrix Canvas */}
         <canvas
           ref={canvasRef}
           width={504}
@@ -413,7 +378,6 @@ export const GameBoardCanvas: React.FC<GameBoardCanvasProps> = ({ gameState, loc
         />
       </div>
 
-      {/* Bottom Matrix Legend Strip */}
       <div className="flex items-center justify-between mt-2.5 pt-2 border-t border-outline-variant text-[10px] font-telemetry-sm text-on-surface-variant flex-wrap gap-2">
         <div className="flex items-center gap-3 flex-wrap">
           <span className="flex items-center gap-1.5">
