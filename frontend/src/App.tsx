@@ -251,10 +251,15 @@ export const App: React.FC = () => {
         return;
       }
 
+      const key = e.key.toLowerCase();
+      const isArrowKey = ['arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(key);
+
+      if (localPlayer && gameState?.status === 'IN_PROGRESS' && isArrowKey) {
+        e.preventDefault();
+      }
+
       if (!localPlayer || !gameState || gameState.status !== 'IN_PROGRESS') return;
       if (gameState.currentTurnPlayerId !== localPlayer.id) return;
-
-      const key = e.key.toLowerCase();
 
       if (key === 'w' || key === 'arrowup') {
         e.preventDefault();

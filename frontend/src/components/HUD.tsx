@@ -362,6 +362,7 @@ export const HUD: React.FC<HUDProps> = ({
           <div className="flex items-center justify-between gap-3">
             <div className="w-32 h-32 relative bg-surface-container-lowest border border-outline-variant p-1 flex items-center justify-center shrink-0">
               <button
+                type="button"
                 onClick={() => onMove('UP')}
                 disabled={!isMyTurn || !isAlive || movementLeft <= 0 || isActionLoading}
                 title="Mover Cima (W / ↑)"
@@ -372,6 +373,7 @@ export const HUD: React.FC<HUDProps> = ({
               </button>
 
               <button
+                type="button"
                 onClick={() => onMove('LEFT')}
                 disabled={!isMyTurn || !isAlive || movementLeft <= 0 || isActionLoading}
                 title="Mover Esquerda (A / ←)"
@@ -390,6 +392,7 @@ export const HUD: React.FC<HUDProps> = ({
               </div>
 
               <button
+                type="button"
                 onClick={() => onMove('RIGHT')}
                 disabled={!isMyTurn || !isAlive || movementLeft <= 0 || isActionLoading}
                 title="Mover Direita (D / →)"
@@ -400,6 +403,7 @@ export const HUD: React.FC<HUDProps> = ({
               </button>
 
               <button
+                type="button"
                 onClick={() => onMove('DOWN')}
                 disabled={!isMyTurn || !isAlive || movementLeft <= 0 || isActionLoading}
                 title="Mover Baixo (S / ↓)"
