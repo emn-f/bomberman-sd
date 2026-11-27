@@ -1,0 +1,4 @@
+# Mantém os scripts shell em LF e os scripts nativos do Windows em CRLF,
+# independentemente do core.autocrlf da máquina.
+*.sh text eol=lf
+*.cmd text eol=crlf
