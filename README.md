@@ -20,42 +20,87 @@ Projeto de Bomberman Multiplayer baseado em turnos utilizando **Java RMI**, **Lo
 │   ├── Projeto_II_Unidade_Entrega_1.pdf
 │   ├── Projeto_II_Unidade_Entrega_2.pdf
 │   └── Projeto_II_Unidade_Entrega_3.pdf
-├── run-server.sh               # Script de execução rápida do Servidor RMI
-├── run-bridge.sh               # Script de execução do Bridge Local
-└── run-frontend.sh             # Script de execução do Frontend Vite
+├── scripts/
+│   ├── run-server.sh / .ps1    # Servidor RMI
+│   ├── run-bridge.sh / .ps1    # Bridge Local (HTTP <-> RMI)
+│   ├── run-frontend.sh / .ps1  # Frontend Vite
+│   ├── run-all.ps1             # Sobe os 4 processos no Windows
+│   ├── setup-env.ps1           # Prepara Java/Maven/Node no Windows
+│   ├── stop-all.ps1            # Derruba os processos das portas
+│   └── start.cmd / stop.cmd    # Atalhos de duplo clique no Windows
+└── README.md
 ```
 
 ---
 
 ## 🚀 Como Executar
 
-### 1. Iniciar o Servidor RMI
+### Linux / macOS
+
+#### 1. Iniciar o Servidor RMI
 ```bash
-./run-server.sh
+./scripts/run-server.sh
 # Ou manualmente:
 cd backend-rmi
 mvn exec:java -Dexec.mainClass="server.ServerMain" -Dexec.args="1099"
 ```
 
-### 2. Iniciar os Bridges Locais (Dois Jogadores)
+#### 2. Iniciar os Bridges Locais (Dois Jogadores)
 Para testar o modo 1v1 em duas abas no mesmo computador, inicie duas instâncias do bridge:
 
 **Terminal 1 (Jogador 1 na porta 8081):**
 ```bash
-./run-bridge.sh 8081 1099 localhost
+./scripts/run-bridge.sh 8081 1099 localhost
 ```
 
 **Terminal 2 (Jogador 2 na porta 8082):**
 ```bash
-./run-bridge.sh 8082 1099 localhost
+./scripts/run-bridge.sh 8082 1099 localhost
 ```
 
-### 3. Iniciar o Frontend React
+#### 3. Iniciar o Frontend React
 ```bash
-./run-frontend.sh
+./scripts/run-frontend.sh
 # Ou:
 cd frontend
 npm run dev
+```
+
+### Windows (PowerShell)
+
+O caminho mais rápido é o `start.cmd`, que sobe **servidor + bridge 8081 + bridge 8082 + frontend** em janelas separadas e aguarda cada serviço ficar pronto:
+
+```bat
+scripts\start.cmd
+```
+
+Na primeira execução, se Java 17, Maven ou Node ainda não estiverem disponíveis, o script chama o `setup-env.ps1` automaticamente (instala tudo em `%USERPROFILE%\tools`, sem precisar de administrador) e compila o projeto.
+
+Também é possível chamar o orquestrador direto:
+
+```powershell
+# Sobe tudo em localhost
+powershell -ExecutionPolicy Bypass -File scripts\run-all.ps1
+
+# Sobe usando o IPv4 da máquina na LAN (para testar de outro dispositivo)
+powershell -ExecutionPolicy Bypass -File scripts\run-all.ps1 -Lan
+
+# Não abre as duas janelas do navegador
+powershell -ExecutionPolicy Bypass -File scripts\run-all.ps1 -NoBrowser
+
+# Derruba os processos das portas 1099/8081/8082/3000
+powershell -ExecutionPolicy Bypass -File scripts\stop-all.ps1 -Force
+# ou: scripts\stop.cmd
+```
+
+Para controlar cada processo manualmente no PowerShell:
+
+```powershell
+.\scripts\setup-env.ps1          # só na primeira vez
+.\scripts\run-server.ps1
+.\scripts\run-bridge.ps1 8081 1099 127.0.0.1
+.\scripts\run-bridge.ps1 8082 1099 127.0.0.1
+.\scripts\run-frontend.ps1
 ```
 
 Acesse `http://localhost:3000` no computador que executa o projeto. Em outro computador na mesma rede, acesse `http://<IP-do-host>:3000`. A interface monta o endereço do bridge usando automaticamente o mesmo host e a porta escolhida (`8081` ou `8082`).

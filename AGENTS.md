@@ -9,9 +9,10 @@
 
 ## Executando
 
-- Prefira os scripts da raiz: eles exportam `PATH="$HOME/.local/bin:$PATH"` e rodam `mvn compile exec:java` (recompilam automaticamente). Se chamar Maven/npm direto, replique esse PATH se os binários não forem encontrados.
-- Um 1v1 local exige **4 processos**: `./run-server.sh`, `./run-bridge.sh 8081 1099 localhost`, `./run-bridge.sh 8082 1099 localhost`, `./run-frontend.sh` (Vite em `:3000`, `host: true`).
-- Sintaxe: `run-server.sh [RMI_PORT] [RMI_HOST]`; `run-bridge.sh [HTTP_PORT] [RMI_PORT] [RMI_HOST]`. Em LAN, o 2º arg do servidor vira `-Djava.rmi.server.hostname` — use o IP da máquina servidora, não `127.0.0.1`, e passe esse mesmo IP como `RMI_HOST` dos bridges; libere TCP `1099`, `8081`, `8082`, `3000`.
+- Prefira os scripts em `scripts/`: os `.sh` exportam `PATH="$HOME/.local/bin:$PATH"` e rodam `mvn compile exec:java` (recompilam automaticamente). Se chamar Maven/npm direto, replique esse PATH se os binários não forem encontrados.
+- Um 1v1 local exige **4 processos**: `./scripts/run-server.sh`, `./scripts/run-bridge.sh 8081 1099 localhost`, `./scripts/run-bridge.sh 8082 1099 localhost`, `./scripts/run-frontend.sh` (Vite em `:3000`, `host: true`).
+- Sintaxe: `scripts/run-server.sh [RMI_PORT] [RMI_HOST]`; `scripts/run-bridge.sh [HTTP_PORT] [RMI_PORT] [RMI_HOST]`. Em LAN, o 2º arg do servidor vira `-Djava.rmi.server.hostname` — use o IP da máquina servidora, não `127.0.0.1`, e passe esse mesmo IP como `RMI_HOST` dos bridges; libere TCP `1099`, `8081`, `8082`, `3000`.
+- No Windows, `scripts\start.cmd` (ou `scripts\run-all.ps1`) sobe os 4 processos em janelas separadas, espera cada porta e roda o `setup-env.ps1` automaticamente se faltar Java 17/Maven/Node. `scripts\stop-all.ps1 -Force` derruba os processos das portas. Os `.ps1` são compatíveis com Windows PowerShell 5.1 e foram validados com `pwsh` (parser + PSScriptAnalyzer).
 - O bridge aceita `RMI_HOST`, `RMI_PORT` e `HTTP_PORT` como variáveis de ambiente, que **sobrescrevem** os argumentos posicionais. Ele escuta em `0.0.0.0` e responde CORS `*`.
 - O frontend monta a URL do bridge com `window.location.hostname` (não `localhost`) e só oferece 8081/8082 na UI; abrir a página pelo IP da máquina faz o navegador usar `<IP>:8081` ou `<IP>:8082`.
 
